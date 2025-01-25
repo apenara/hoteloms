@@ -49,6 +49,7 @@ interface RequestCardProps {
     id: string;
     type: keyof typeof REQUEST_TYPES;
     message?: string;
+    description?: string;
     createdAt: { seconds: number };
   };
   onComplete: (requestId: string, notes: string) => Promise<void>;
@@ -98,6 +99,7 @@ export function RequestCard({ request, onComplete }: RequestCardProps) {
               <Clock className="h-4 w-4" />
               Hace {getTimeElapsed(request.createdAt.seconds)}
             </div>
+            <div className="font-medium">{request.description}</div>
           </div>
         </div>
 

@@ -521,3 +521,144 @@ export default function StaffRoomView() {
     </div>
   );
 }
+
+
+// 'use client';
+
+// import { useState, useEffect } from 'react';
+// import { useParams } from 'next/navigation';
+// import { doc, getDoc } from 'firebase/firestore';
+// import { db } from '@/lib/firebase/config';
+// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// import { Alert, AlertDescription } from '@/components/ui/alert';
+// import { useAuth } from '@/lib/auth';
+// import { MaintenanceDialog } from '@/components/maintenance/MaintenanceDialog';
+// import { ErrorDialog } from '@/components/shared/ErrorDialog';
+// import { Loader2 } from 'lucide-react';
+// import { updateRoomState } from '@/app/services/roomStateService';
+
+// export default function StaffRoomView() {
+//   const params = useParams();
+//   const { user } = useAuth();
+//   const [room, setRoom] = useState(null);
+//   const [hotel, setHotel] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
+//   const [showErrorDialog, setShowErrorDialog] = useState(false);
+//   const [errorMessage, setErrorMessage] = useState('');
+//   const [successMessage, setSuccessMessage] = useState('');
+
+//   useEffect(() => {
+//     const fetchRoomData = async () => {
+//       if (!params?.hotelId || !params?.roomId) return;
+
+//       try {
+//         const [hotelDoc, roomDoc] = await Promise.all([
+//           getDoc(doc(db, 'hotels', params.hotelId)),
+//           getDoc(doc(db, 'hotels', params.hotelId, 'rooms', params.roomId))
+//         ]);
+
+//         if (!hotelDoc.exists() || !roomDoc.exists()) {
+//           throw new Error('Habitación no encontrada');
+//         }
+
+//         setHotel({ id: hotelDoc.id, ...hotelDoc.data() });
+//         setRoom({ id: roomDoc.id, ...roomDoc.data() });
+//       } catch (error) {
+//         setErrorMessage(error.message);
+//         setShowErrorDialog(true);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+
+//     fetchRoomData();
+//   }, [params]);
+
+//   const handleStateChange = async (newState) => {
+//     if (newState === 'maintenance') {
+//       setShowMaintenanceDialog(true);
+//       return;
+//     }
+
+//     try {
+//       await updateRoomState({
+//         hotelId: params.hotelId,
+//         roomId: params.roomId,
+//         currentStatus: room.status,
+//         newStatus: newState,
+//         notes: '',
+//         user,
+//         room
+//       });
+
+//       setRoom(prev => ({ ...prev, status: newState }));
+//       setSuccessMessage('Estado actualizado correctamente');
+//       setTimeout(() => setSuccessMessage(''), 3000);
+//     } catch (error) {
+//       setErrorMessage('Error al actualizar el estado');
+//       setShowErrorDialog(true);
+//     }
+//   };
+
+//   const handleMaintenanceSubmit = async (notes: string) => {
+//     try {
+//       await updateRoomState({
+//         hotelId: params.hotelId,
+//         roomId: params.roomId,
+//         currentStatus: room.status,
+//         newStatus: 'maintenance',
+//         notes,
+//         user,
+//         room
+//       });
+
+//       setRoom(prev => ({ ...prev, status: 'maintenance' }));
+//       setSuccessMessage('Solicitud de mantenimiento enviada correctamente');
+//       setTimeout(() => setSuccessMessage(''), 3000);
+//     } catch (error) {
+//       setErrorMessage('Error al enviar la solicitud de mantenimiento');
+//       setShowErrorDialog(true);
+//     }
+//   };
+
+//   if (loading) {
+//     return (
+//       <div className="min-h-screen flex items-center justify-center">
+//         <Loader2 className="h-8 w-8 animate-spin" />
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="p-4 max-w-2xl mx-auto">
+//       <Card>
+//         <CardHeader>
+//           <CardTitle>
+//             {hotel?.hotelName} - Habitación {room?.number}
+//           </CardTitle>
+//         </CardHeader>
+//         <CardContent>
+//           {successMessage && (
+//             <Alert className="bg-green-100 mb-4">
+//               <AlertDescription>{successMessage}</AlertDescription>
+//             </Alert>
+//           )}
+//           {/* Aquí va el contenido de los estados disponibles */}
+//         </CardContent>
+//       </Card>
+
+//       <MaintenanceDialog 
+//         open={showMaintenanceDialog}
+//         onOpenChange={setShowMaintenanceDialog}
+//         onSubmit={handleMaintenanceSubmit}
+//       />
+
+//       <ErrorDialog
+//         open={showErrorDialog}
+//         onOpenChange={setShowErrorDialog}
+//         message={errorMessage}
+//       />
+//     </div>
+//   );
+// }
