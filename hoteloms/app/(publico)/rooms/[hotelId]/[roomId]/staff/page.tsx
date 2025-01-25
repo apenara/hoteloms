@@ -25,36 +25,36 @@ import { ALLOWED_TRANSITIONS, ROOM_STATES } from '@/app/lib/constants/room-state
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 
 // Estados específicos para el personal de limpieza
-const HOUSEKEEPING_STATES = {
-  'cleaning_started': {
-    label: 'Iniciar Limpieza',
-    icon: <ClipboardList className="h-5 w-5" />,
-    color: 'bg-blue-100 border-blue-500 text-blue-700',
-    description: 'Comenzar limpieza de la habitación'
-  },
-  'cleaning_completed': {
-    label: 'Limpieza Terminada',
-    icon: <CheckCircle2 className="h-5 w-5" />,
-    color: 'bg-green-100 border-green-500 text-green-700',
-    description: 'Limpieza finalizada, pendiente de supervisión'
-  },
-  'ready_for_inspection': {
-    label: 'Lista para Inspección',
-    icon: <Eye className="h-5 w-5" />,
-    color: 'bg-yellow-100 border-yellow-500 text-yellow-700',
-    description: 'Habitación lista para ser inspeccionada'
-  }
-};
+// const HOUSEKEEPING_STATES = {
+//   'cleaning_started': {
+//     label: 'Iniciar Limpieza',
+//     icon: <ClipboardList className="h-5 w-5" />,
+//     color: 'bg-blue-100 border-blue-500 text-blue-700',
+//     description: 'Comenzar limpieza de la habitación'
+//   },
+//   'cleaning_completed': {
+//     label: 'Limpieza Terminada',
+//     icon: <CheckCircle2 className="h-5 w-5" />,
+//     color: 'bg-green-100 border-green-500 text-green-700',
+//     description: 'Limpieza finalizada, pendiente de supervisión'
+//   },
+//   'ready_for_inspection': {
+//     label: 'Lista para Inspección',
+//     icon: <Eye className="h-5 w-5" />,
+//     color: 'bg-yellow-100 border-yellow-500 text-yellow-700',
+//     description: 'Habitación lista para ser inspeccionada'
+//   }
+// };
 
-// Estado de mantenimiento
-const MAINTENANCE_STATE = {
-  'maintenance': {
-    label: 'Solicitar Mantenimiento',
-    icon: <AlertTriangle className="h-5 w-5" />,
-    color: 'bg-red-100 border-red-500 text-red-700',
-    description: 'Se requiere mantenimiento'
-  }
-};
+// // Estado de mantenimiento
+// const MAINTENANCE_STATE = {
+//   'maintenance': {
+//     label: 'Solicitar Mantenimiento',
+//     icon: <AlertTriangle className="h-5 w-5" />,
+//     color: 'bg-red-100 border-red-500 text-red-700',
+//     description: 'Se requiere mantenimiento'
+//   }
+// };
 
 export default function StaffRoomView() {
   const params = useParams();
