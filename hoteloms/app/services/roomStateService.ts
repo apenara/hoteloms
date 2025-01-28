@@ -1,6 +1,8 @@
-// services/roomStateService.ts
-import { collection, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
+// src/lib/services/roomStateService.ts
+import { collection, doc, addDoc, updateDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { createMaintenanceRequest } from './maintenanceService';
+import type { Room } from '@/lib/types';
 
 interface UpdateStateParams {
   hotelId: string;
@@ -9,7 +11,7 @@ interface UpdateStateParams {
   newStatus: string;
   notes: string;
   user: any;
-  room: any;
+  room: Room;
 }
 
 export async function updateRoomState({
@@ -21,76 +23,80 @@ export async function updateRoomState({
   user,
   room
 }: UpdateStateParams) {
-  const timestamp = Timestamp.now();
-  const roomRef = doc(db, 'hotels', hotelId, 'rooms', roomId);
+  try {
+    const timestamp = Timestamp.now();
+    const roomRef = doc(db, 'hotels', hotelId, 'rooms', roomId);
 
-  // Actualizar estado de la habitación
-  await updateDoc(roomRef, {
-    status: newStatus,
-    lastStatusChange: timestamp,
-    lastUpdatedBy: {
-      id: user.uid,
-      name: user.name,
-      role: user.role
-    },
-    ...(newStatus === 'maintenance' ? {
-      currentMaintenance: {
+    // Obtener estado actual de limpieza si existe
+    const roomDoc = await getDoc(roomRef);
+    const roomData = roomDoc.data();
+    const wasInCleaning = currentStatus?.includes('cleaning_');
+    const cleaningStaffId = wasInCleaning ? roomData?.assignedTo : null;
+
+    // Preparar datos de actualización
+    const updateData: any = {
+      status: newStatus,
+      lastStatusChange: timestamp,
+      lastUpdatedBy: {
+        id: user.uid,
+        name: user.name,
+        role: user.role,
+        timestamp: timestamp
+      }
+    };
+
+    // Si el nuevo estado es mantenimiento, guardar datos adicionales
+    if (newStatus === 'maintenance') {
+      updateData.currentMaintenance = {
         status: 'pending',
         description: notes,
-        createdAt: Timestamp.now()
-      }
-    } : {})
-  });
+        createdAt: timestamp
+      };
 
-  // Registrar en historial
-  const historyRef = collection(db, 'hotels', hotelId, 'rooms', roomId, 'history');
-  await addDoc(historyRef, {
-    previousStatus: currentStatus,
-    newStatus,
-    timestamp,
-    notes: notes.trim() || 'Sin notas adicionales',
-    staffMember: {
-      id: user.uid,
-      name: user.name,
-      role: user.role,
-      accessType: user.accessType || 'email'
+      // Si estaba en limpieza, mantener la asignación
+      if (wasInCleaning) {
+        updateData.previousCleaningState = currentStatus;
+        updateData.previousCleaningStaff = cleaningStaffId;
+      }
     }
-  });
 
-  if (newStatus === 'maintenance') {
-    // Crear registro de mantenimiento
-    const maintenanceRef = collection(db, 'hotels', hotelId, 'maintenance');
-    await addDoc(maintenanceRef, {
-      roomId,
-      roomNumber: room.number,
-      type: 'corrective',
-      status: 'pending',
-      priority: 'medium',
-      location: `Habitación ${room.number}`,
-      description: notes,
-      createdAt: timestamp,
-      source: 'room_request',
-      requestedBy: {
+    // Actualizar estado de la habitación
+    await updateDoc(roomRef, updateData);
+
+    // Registrar en historial
+    const historyRef = collection(db, 'hotels', hotelId, 'rooms', roomId, 'history');
+    await addDoc(historyRef, {
+      previousStatus: currentStatus,
+      newStatus,
+      timestamp,
+      notes: notes.trim() || 'Sin notas adicionales',
+      staffMember: {
         id: user.uid,
         name: user.name,
-        role: user.role
+        role: user.role,
+        accessType: user.accessType || 'email'
       }
     });
 
-    // Crear solicitud
-    const requestsRef = collection(db, 'hotels', hotelId, 'requests');
-    await addDoc(requestsRef, {
-      roomId,
-      roomNumber: room.number,
-      type: 'maintenance',
-      status: 'pending',
-      createdAt: timestamp,
-      description: notes,
-      requestedBy: {
-        id: user.uid,
-        name: user.name,
-        role: user.role
-      }
-    });
+    // Si es mantenimiento, crear solicitud
+    if (newStatus === 'maintenance') {
+      await createMaintenanceRequest({
+        hotelId,
+        roomId,
+        room,
+        notes,
+        user,
+        previousState: {
+          status: currentStatus,
+          wasInCleaning,
+          cleaningStaffId
+        }
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error al actualizar estado:', error);
+    throw error;
   }
 }

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { useAuth } from '@/lib/auth';
+import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -12,55 +13,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Loader2,
   History,
-  ClipboardList,
-  CheckCircle2,
-  Eye,
-  AlertTriangle,
-  MessageSquare
+  MessageSquare,
+  Clock,
+  CheckCircle
 } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
 import { RequestCard } from '@/components/hotels/RequestCard';
-import MaintenancePreview from '@/app/components/maintenance/MaintenancePreview';
-import { ALLOWED_TRANSITIONS, ROOM_STATES } from '@/app/lib/constants/room-states';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
-
-// Estados específicos para el personal de limpieza
-// const HOUSEKEEPING_STATES = {
-//   'cleaning_started': {
-//     label: 'Iniciar Limpieza',
-//     icon: <ClipboardList className="h-5 w-5" />,
-//     color: 'bg-blue-100 border-blue-500 text-blue-700',
-//     description: 'Comenzar limpieza de la habitación'
-//   },
-//   'cleaning_completed': {
-//     label: 'Limpieza Terminada',
-//     icon: <CheckCircle2 className="h-5 w-5" />,
-//     color: 'bg-green-100 border-green-500 text-green-700',
-//     description: 'Limpieza finalizada, pendiente de supervisión'
-//   },
-//   'ready_for_inspection': {
-//     label: 'Lista para Inspección',
-//     icon: <Eye className="h-5 w-5" />,
-//     color: 'bg-yellow-100 border-yellow-500 text-yellow-700',
-//     description: 'Habitación lista para ser inspeccionada'
-//   }
-// };
-
-// // Estado de mantenimiento
-// const MAINTENANCE_STATE = {
-//   'maintenance': {
-//     label: 'Solicitar Mantenimiento',
-//     icon: <AlertTriangle className="h-5 w-5" />,
-//     color: 'bg-red-100 border-red-500 text-red-700',
-//     description: 'Se requiere mantenimiento'
-//   }
-// };
+import MaintenancePreview from '@/components/maintenance/MaintenancePreview';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import type { Room } from '@/lib/types';
+import { ROOM_STATES } from '@/app/lib/constants/room-states';
+import { registrarCambioEstado } from '@/app/services/housekeeping';
 
 export default function StaffRoomView() {
   const params = useParams();
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
-  const [room, setRoom] = useState(null);
+  const [room, setRoom] = useState<Room | null>(null);
   const [hotel, setHotel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -71,6 +39,36 @@ export default function StaffRoomView() {
   const [activeTab, setActiveTab] = useState('details');
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [procesando, setProcesando] = useState(false);
+
+  const fetchData = async () => {
+    if (!params?.hotelId || !params?.roomId) return;
+
+    try {
+      setLoading(true);
+      const [hotelDoc, roomDoc] = await Promise.all([
+        getDoc(doc(db, 'hotels', params.hotelId)),
+        getDoc(doc(db, 'hotels', params.hotelId, 'rooms', params.roomId))
+      ]);
+
+      if (!hotelDoc.exists() || !roomDoc.exists()) {
+        throw new Error('Habitación no encontrada');
+      }
+
+      setHotel({ id: hotelDoc.id, ...hotelDoc.data() });
+      setRoom({ id: roomDoc.id, ...roomDoc.data() } as Room);
+
+      await Promise.all([
+        fetchPendingRequests(),
+        fetchHistoryEntries()
+      ]);
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchPendingRequests = async () => {
     if (!params?.hotelId || !params?.roomId) return;
@@ -111,47 +109,16 @@ export default function StaffRoomView() {
 
   useEffect(() => {
     setMounted(true);
-  }, []); // Este effect solo maneja el mounted
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!params?.hotelId || !params?.roomId) return;
-
-      try {
-        setLoading(true);
-        const [hotelDoc, roomDoc] = await Promise.all([
-          getDoc(doc(db, 'hotels', params.hotelId)),
-          getDoc(doc(db, 'hotels', params.hotelId, 'rooms', params.roomId))
-        ]);
-
-        if (!hotelDoc.exists() || !roomDoc.exists()) {
-          throw new Error('Habitación no encontrada');
-        }
-
-        setHotel({ id: hotelDoc.id, ...hotelDoc.data() });
-        setRoom({ id: roomDoc.id, ...roomDoc.data() });
-
-        await Promise.all([fetchPendingRequests(), fetchHistoryEntries()]);
-      } catch (error) {
-        console.error('Error:', error);
-        setError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [params?.hotelId, params?.roomId]); // Este effect maneja la carga de datos
+  }, [params?.hotelId, params?.roomId]);
 
-  if (!mounted || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  const handleStateChange = async (newState: string) => {
+    if (!user || !params?.hotelId || !params?.roomId || !room) {
+      setErrorMessage('Error: Faltan datos necesarios');
+      setShowErrorDialog(true);
+      return;
+    }
 
-  const handleStateChange = async (newState) => {
     if (newState === 'maintenance' && !notes.trim()) {
       setErrorMessage('Por favor, añade una nota describiendo el problema de mantenimiento');
       setShowErrorDialog(true);
@@ -159,152 +126,44 @@ export default function StaffRoomView() {
     }
 
     try {
-      const timestamp = Timestamp.now();
-      const roomRef = doc(db, 'hotels', params.hotelId, 'rooms', params.roomId);
+      setProcesando(true);
 
-      // Actualizar estado de la habitación
-      await updateDoc(roomRef, {
-        status: newState,
-        lastStatusChange: timestamp,
-        lastUpdatedBy: {
-          id: user.uid,
-          name: user.name,
-          role: user.role
-        },
-        ...(newState === 'maintenance' ? {
-          currentMaintenance: {
-            status: 'pending',
-            description: notes,
-            createdAt: Timestamp.now()
-          }
-        } : {})
-      });
-
-      // Si es una solicitud de mantenimiento, crear el registro correspondiente
-      if (newState === 'maintenance') {
-        const maintenanceRef = collection(db, 'hotels', params.hotelId, 'maintenance');
-        await addDoc(maintenanceRef, {
-          roomId: params.roomId,
-          roomNumber: room.number,
-          type: 'corrective',
-          status: 'pending',
-          priority: 'medium',
-          location: `Habitación ${room.number}`,
-          description: notes,
-          createdAt: Timestamp.now(),
-          // Remover scheduledFor aquí, se establecerá cuando se asigne personal
-          source: 'room_request',
-          requestedBy: {
-            id: user.uid,
-            name: user.name,
-            role: user.role
-          }
-        });
-
-        // También registrar en requests para la vista de huéspedes
-        const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
-        await addDoc(requestsRef, {
-          roomId: params.roomId,
-          roomNumber: room.number,
-          type: 'maintenance',
-          status: 'pending',
-          createdAt: timestamp,
-          description: notes,
-          requestedBy: {
-            id: user.uid,
-            name: user.name,
-            role: user.role
-          }
-        });
-      }
-
-      // Registrar en el historial
-      const historyRef = collection(db, 'hotels', params.hotelId, 'rooms', params.roomId, 'history');
-      await addDoc(historyRef, {
-        previousStatus: room.status,
-        newStatus: newState,
-        timestamp,
-        notes: notes.trim() || 'Sin notas adicionales',
-        staffMember: {
-          id: user.uid,
-          name: user.name,
-          role: user.role,
-          accessType: user.accessType || 'email'
-        }
-      });
+      await registrarCambioEstado(
+        params.hotelId,
+        params.roomId,
+        user.uid,
+        newState,
+        notes.trim() || undefined
+      );
 
       setSuccessMessage('Estado actualizado correctamente');
       setNotes('');
-      setRoom(prev => ({ ...prev, status: newState }));
+      setRoom(prev => prev ? { ...prev, status: newState } : null);
+
+      // Recargar datos actualizados
+      await Promise.all([
+        fetchPendingRequests(),
+        fetchHistoryEntries()
+      ]);
 
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
     } catch (error) {
       console.error('Error:', error);
-      setError('Error al actualizar el estado');
-    }
-  };
-
-  const handleCompleteRequest = async (requestId, completionNotes) => {
-    if (!user) return;
-
-    try {
-      const timestamp = new Date();
-      const requestRef = doc(db, 'hotels', params.hotelId, 'requests', requestId);
-      const request = pendingRequests.find(r => r.id === requestId);
-
-      // Actualizar la solicitud
-      await updateDoc(requestRef, {
-        status: 'completed',
-        completedAt: timestamp,
-        completedBy: {
-          id: user.uid,
-          name: user.name,
-          role: user.role,
-          accessType: user.accessType || 'email'
-        },
-        completionNotes
-      });
-
-      // Registrar en el historial
-      const historyRef = collection(db, 'hotels', params.hotelId, 'rooms', params.roomId, 'history');
-      await addDoc(historyRef, {
-        type: 'request_completed',
-        requestId,
-        originalRequestType: request?.type,
-        timestamp,
-        notes: completionNotes || 'Sin notas adicionales',
-        staffMember: {
-          id: user.uid,
-          name: user.name,
-          role: user.role,
-          accessType: user.accessType || 'email'
-        },
-        previousStatus: request?.status,
-        newStatus: 'completed'
-      });
-
-      setSuccessMessage('Solicitud marcada como completada');
-
-      // Actualizar solicitudes pendientes e historial
-      await Promise.all([
-        fetchPendingRequests(),
-        fetchHistoryEntries()
-      ]);
-
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Error al completar la solicitud');
+      setErrorMessage('Error al actualizar el estado');
+      setShowErrorDialog(true);
+    } finally {
+      setProcesando(false);
     }
   };
 
   const getAvailableStates = () => {
-    if (!user) return [];
+    if (!user || !room) return [];
     let states = [];
   
     if (user.role === 'housekeeper' || user.role === 'hotel_admin') {
-      switch (room?.status) {
+      switch (room.status) {
         case 'available':
         case 'occupied':
         case 'clean_occupied': 
@@ -314,13 +173,11 @@ export default function StaffRoomView() {
           states = ['clean_occupied'];
           break;
         case 'cleaning_checkout':
+        case 'cleaning_touch':
           states = ['inspection'];
           break;
         case 'inspection':
           states = ['available'];
-          break;
-        case 'cleaning_touch':
-          states = ['inspection'];
           break;
         case 'need_cleaning':
           states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
@@ -335,29 +192,8 @@ export default function StaffRoomView() {
     }
     return states;
   };
-  // En el render, reemplazar el mapeo de estados
-  {
-    getAvailableStates().map(state => {
-      const stateInfo = ROOM_STATES[state];
-      const StateIcon = stateInfo.icon;
-      return (
-        <Button
-          key={state}
-          variant="outline"
-          className={`flex flex-col items-center p-4 h-auto ${stateInfo.color}`}
-          onClick={() => handleStateChange(state)}
-        >
-          <StateIcon className="h-5 w-5" />
-          <span className="mt-2 text-sm font-medium">{stateInfo.label}</span>
-          <span className="mt-1 text-xs text-gray-600">
-            {stateInfo.requiresInspection ? 'Requiere inspección' : ''}
-          </span>
-        </Button>
-      );
-    })
-  }
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -404,7 +240,6 @@ export default function StaffRoomView() {
                 <MaintenancePreview maintenance={room.currentMaintenance} />
               )}
 
-
               {pendingRequests.length > 0 && (
                 <div className="space-y-4 mb-6">
                   <h3 className="font-medium flex items-center gap-2">
@@ -416,7 +251,7 @@ export default function StaffRoomView() {
                       <RequestCard
                         key={request.id}
                         request={request}
-                        onComplete={handleCompleteRequest}
+                        onComplete={() => {}} // Implementar si es necesario
                       />
                     ))}
                   </div>
@@ -424,7 +259,14 @@ export default function StaffRoomView() {
               )}
 
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Estado Actual: {room?.status}</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Estado Actual: {ROOM_STATES[room?.status]?.label || room?.status}</h3>
+                  {room?.tiempoLimpieza && (
+                    <div className="text-sm text-gray-600">
+                      Último tiempo de limpieza: {room.tiempoLimpieza}min
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   {getAvailableStates().map(state => {
@@ -436,12 +278,15 @@ export default function StaffRoomView() {
                         variant="outline"
                         className={`flex flex-col items-center p-4 h-auto ${stateInfo?.color || ''}`}
                         onClick={() => handleStateChange(state)}
+                        disabled={procesando}
                       >
                         <StateIcon className="h-5 w-5" />
                         <span className="mt-2 text-sm font-medium">{stateInfo?.label}</span>
-                        <span className="mt-1 text-xs text-gray-600">
-                          {stateInfo?.description}
-                        </span>
+                        {stateInfo?.requiresInspection && (
+                          <span className="mt-1 text-xs text-gray-600">
+                            Requiere inspección
+                          </span>
+                        )}
                       </Button>
                     );
                   })}
@@ -460,6 +305,7 @@ export default function StaffRoomView() {
                         : "Añade notas adicionales (opcional)..."
                     }
                     className="min-h-[100px]"
+                    disabled={procesando}
                   />
                 </div>
               </div>
@@ -483,8 +329,8 @@ export default function StaffRoomView() {
                         <td className="py-2">
                           {new Date(entry.timestamp.seconds * 1000).toLocaleString()}
                         </td>
-                        <td className="py-2">{entry.previousStatus}</td>
-                        <td className="py-2">{entry.newStatus}</td>
+                        <td className="py-2">{ROOM_STATES[entry.previousStatus]?.label || entry.previousStatus}</td>
+                        <td className="py-2">{ROOM_STATES[entry.newStatus]?.label || entry.newStatus}</td>
                         <td className="py-2">
                           {entry.staffMember?.name}
                           <br />
@@ -503,6 +349,7 @@ export default function StaffRoomView() {
           </Tabs>
         </CardContent>
       </Card>
+
       <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
         <DialogContent>
           <DialogHeader>
@@ -521,144 +368,3 @@ export default function StaffRoomView() {
     </div>
   );
 }
-
-
-// 'use client';
-
-// import { useState, useEffect } from 'react';
-// import { useParams } from 'next/navigation';
-// import { doc, getDoc } from 'firebase/firestore';
-// import { db } from '@/lib/firebase/config';
-// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Alert, AlertDescription } from '@/components/ui/alert';
-// import { useAuth } from '@/lib/auth';
-// import { MaintenanceDialog } from '@/components/maintenance/MaintenanceDialog';
-// import { ErrorDialog } from '@/components/shared/ErrorDialog';
-// import { Loader2 } from 'lucide-react';
-// import { updateRoomState } from '@/app/services/roomStateService';
-
-// export default function StaffRoomView() {
-//   const params = useParams();
-//   const { user } = useAuth();
-//   const [room, setRoom] = useState(null);
-//   const [hotel, setHotel] = useState(null);
-//   const [loading, setLoading] = useState(true);
-//   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
-//   const [showErrorDialog, setShowErrorDialog] = useState(false);
-//   const [errorMessage, setErrorMessage] = useState('');
-//   const [successMessage, setSuccessMessage] = useState('');
-
-//   useEffect(() => {
-//     const fetchRoomData = async () => {
-//       if (!params?.hotelId || !params?.roomId) return;
-
-//       try {
-//         const [hotelDoc, roomDoc] = await Promise.all([
-//           getDoc(doc(db, 'hotels', params.hotelId)),
-//           getDoc(doc(db, 'hotels', params.hotelId, 'rooms', params.roomId))
-//         ]);
-
-//         if (!hotelDoc.exists() || !roomDoc.exists()) {
-//           throw new Error('Habitación no encontrada');
-//         }
-
-//         setHotel({ id: hotelDoc.id, ...hotelDoc.data() });
-//         setRoom({ id: roomDoc.id, ...roomDoc.data() });
-//       } catch (error) {
-//         setErrorMessage(error.message);
-//         setShowErrorDialog(true);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     fetchRoomData();
-//   }, [params]);
-
-//   const handleStateChange = async (newState) => {
-//     if (newState === 'maintenance') {
-//       setShowMaintenanceDialog(true);
-//       return;
-//     }
-
-//     try {
-//       await updateRoomState({
-//         hotelId: params.hotelId,
-//         roomId: params.roomId,
-//         currentStatus: room.status,
-//         newStatus: newState,
-//         notes: '',
-//         user,
-//         room
-//       });
-
-//       setRoom(prev => ({ ...prev, status: newState }));
-//       setSuccessMessage('Estado actualizado correctamente');
-//       setTimeout(() => setSuccessMessage(''), 3000);
-//     } catch (error) {
-//       setErrorMessage('Error al actualizar el estado');
-//       setShowErrorDialog(true);
-//     }
-//   };
-
-//   const handleMaintenanceSubmit = async (notes: string) => {
-//     try {
-//       await updateRoomState({
-//         hotelId: params.hotelId,
-//         roomId: params.roomId,
-//         currentStatus: room.status,
-//         newStatus: 'maintenance',
-//         notes,
-//         user,
-//         room
-//       });
-
-//       setRoom(prev => ({ ...prev, status: 'maintenance' }));
-//       setSuccessMessage('Solicitud de mantenimiento enviada correctamente');
-//       setTimeout(() => setSuccessMessage(''), 3000);
-//     } catch (error) {
-//       setErrorMessage('Error al enviar la solicitud de mantenimiento');
-//       setShowErrorDialog(true);
-//     }
-//   };
-
-//   if (loading) {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center">
-//         <Loader2 className="h-8 w-8 animate-spin" />
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="p-4 max-w-2xl mx-auto">
-//       <Card>
-//         <CardHeader>
-//           <CardTitle>
-//             {hotel?.hotelName} - Habitación {room?.number}
-//           </CardTitle>
-//         </CardHeader>
-//         <CardContent>
-//           {successMessage && (
-//             <Alert className="bg-green-100 mb-4">
-//               <AlertDescription>{successMessage}</AlertDescription>
-//             </Alert>
-//           )}
-//           {/* Aquí va el contenido de los estados disponibles */}
-//         </CardContent>
-//       </Card>
-
-//       <MaintenanceDialog 
-//         open={showMaintenanceDialog}
-//         onOpenChange={setShowMaintenanceDialog}
-//         onSubmit={handleMaintenanceSubmit}
-//       />
-
-//       <ErrorDialog
-//         open={showErrorDialog}
-//         onOpenChange={setShowErrorDialog}
-//         message={errorMessage}
-//       />
-//     </div>
-//   );
-// }
