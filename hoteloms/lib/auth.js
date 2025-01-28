@@ -2,11 +2,15 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
-// Crear el contexto
-const AuthContext = createContext({});
+// Crear el contexto con la función signOut
+const AuthContext = createContext({
+  user: null,
+  loading: true,
+  signOut: async () => {}
+});
 
 // Hook personalizado para usar el contexto
 export function useAuth() {
@@ -54,8 +58,7 @@ export function AuthProvider({ children }) {
               // Verificar que el staff pertenece al hotel correcto
               if (staffData.hotelId) {
                 const staffRef = collection(db, 'hotels', staffData.hotelId, 'staff');
-                const staffQuery = query(staffRef, where('authId', '==', 'kgvKeZnwZVMcTf0MA17DIBVrbnB2'));
-                // const staffQuery = query(staffRef, where('authId', '==', firebaseUser.uid));
+                const staffQuery = query(staffRef, where('authId', '==', firebaseUser.uid));
                 const staffSnapshot = await getDocs(staffQuery);
                 
                 if (!staffSnapshot.empty) {
@@ -95,9 +98,30 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
+  // Función de cierre de sesión
+  const signOut = async () => {
+    try {
+      // Limpiar localStorage
+      localStorage.removeItem('staffAccess');
+      
+      // Cerrar sesión en Firebase
+      await firebaseSignOut(auth);
+      
+      // Limpiar el estado del usuario
+      setUser(null);
+      
+      // Redirigir a la página de login
+      window.location.href = '/auth/login';
+    } catch (error) {
+      console.error('Error durante el cierre de sesión:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
-    loading
+    loading,
+    signOut
   };
 
   return (

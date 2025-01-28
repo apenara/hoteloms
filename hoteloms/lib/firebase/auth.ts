@@ -7,6 +7,7 @@ import {
   import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
   import { auth, db } from './config';
   
+  
   export async function registerHotel({
     email,
     password,
