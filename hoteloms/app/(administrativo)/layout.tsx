@@ -17,7 +17,7 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/hotel-admin/dashboard', icon: LayoutDashboard },
   { name: 'Personal', href: '/hotel-admin/staff', icon: Users },
-  { name: 'Habitaciones', href: '/hotel-admin/rooms', icon: BedDouble },
+  // { name: 'Habitaciones', href: '/hotel-admin/rooms', icon: BedDouble },
   { name: 'Housekeeping', href: '/hotel-admin/housekeeping', icon: ClipboardList },
   { name: 'Mantenimiento', href: '/hotel-admin/maintenance', icon: AlertTriangle },
   { name: 'Gestion QR', href: '/hotel-admin/qr-manager', icon: QrCode },

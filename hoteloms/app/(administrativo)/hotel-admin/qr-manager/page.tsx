@@ -1,4 +1,3 @@
-// src/app/(hotel)/qr-manager/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,10 +7,11 @@ import { collection, query, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { QRCodeSVG } from 'qrcode.react';
 import { useRouter } from 'next/navigation';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import QRDownloadManager from '@/app/components/qr/QrDownloadManager';
 
 export default function QRManager() {
   const { user } = useAuth();
@@ -20,9 +20,15 @@ export default function QRManager() {
   const [selectedRooms, setSelectedRooms] = useState(new Set());
   const [qrSize, setQrSize] = useState(256);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const { downloadMultipleQRs, downloading } = QRDownloadManager({
+    rooms,
+    hotelId: user?.hotelId,
+    size: qrSize
+  });
 
   useEffect(() => {
-    // Verificar rol de usuario
     if (user && user.role !== 'hotel_admin') {
       router.push('/dashboard');
       return;
@@ -41,6 +47,7 @@ export default function QRManager() {
         setRooms(roomsData);
       } catch (error) {
         console.error('Error fetching rooms:', error);
+        setError('Error al cargar las habitaciones');
       } finally {
         setLoading(false);
       }
@@ -68,36 +75,27 @@ export default function QRManager() {
     setSelectedRooms(new Set());
   };
 
-  const downloadQR = (roomId, roomNumber) => {
+  const downloadSingleQR = async (roomId, roomNumber) => {
     const svg = document.getElementById(`qr-${roomId}`);
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
-    img.onload = () => {
-      canvas.width = qrSize;
-      canvas.height = qrSize;
-      ctx.drawImage(img, 0, 0);
-      const pngFile = canvas.toDataURL("image/png");
-      const downloadLink = document.createElement("a");
-      downloadLink.download = `QR-Habitacion-${roomNumber}.png`;
-      downloadLink.href = pngFile;
-      downloadLink.click();
-    };
-    img.src = "data:image/svg+xml;base64," + btoa(svgData);
-  };
+    if (!svg) {
+      console.error('SVG element not found');
+      return;
+    }
 
-  const downloadSelectedQRs = () => {
-    selectedRooms.forEach(roomId => {
-      const room = rooms.find(r => r.id === roomId);
-      if (room) {
-        downloadQR(room.id, room.number);
-      }
-    });
+    try {
+      await downloadMultipleQRs([roomId]);
+    } catch (error) {
+      console.error('Error downloading QR:', error);
+      setError('Error al descargar el código QR');
+    }
   };
 
   if (loading) {
-    return <div>Cargando...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
   }
 
   return (
@@ -107,6 +105,12 @@ export default function QRManager() {
           <CardTitle>Gestor de Códigos QR</CardTitle>
         </CardHeader>
         <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
           <Tabs defaultValue="single">
             <TabsList>
               <TabsTrigger value="single">QR Individual</TabsTrigger>
@@ -129,8 +133,11 @@ export default function QRManager() {
                             includeMargin
                           />
                         </div>
-                        <Button onClick={() => downloadQR(room.id, room.number)}>
-                          Descargar QR
+                        <Button 
+                          onClick={() => downloadSingleQR(room.id, room.number)}
+                          disabled={downloading}
+                        >
+                          {downloading ? 'Descargando...' : 'Descargar QR'}
                         </Button>
                       </div>
                     </CardContent>
@@ -141,7 +148,7 @@ export default function QRManager() {
 
             <TabsContent value="multiple" className="mt-4">
               <div className="space-y-4">
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-wrap">
                   <Button onClick={selectAllRooms}>Seleccionar Todas</Button>
                   <Button onClick={deselectAllRooms} variant="outline">
                     Deseleccionar Todas
@@ -174,10 +181,12 @@ export default function QRManager() {
                 </div>
 
                 <Button
-                  onClick={downloadSelectedQRs}
-                  disabled={selectedRooms.size === 0}
+                  onClick={() => downloadMultipleQRs(Array.from(selectedRooms))}
+                  disabled={selectedRooms.size === 0 || downloading}
                 >
-                  Descargar {selectedRooms.size} QR(s)
+                  {downloading 
+                    ? 'Descargando...' 
+                    : `Descargar ${selectedRooms.size} QR(s)`}
                 </Button>
               </div>
             </TabsContent>
