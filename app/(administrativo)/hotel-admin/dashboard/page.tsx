@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, JSX } from "react";
 import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/config";
 import { collection, query, onSnapshot } from "firebase/firestore";
@@ -30,7 +30,8 @@ import { RoomCard } from "@/components/hotels/RoomCard";
 // import { RequestNotifications } from '@/components/dashboard/RequestNotifications';
 import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
 import { ROOM_STATES } from "@/app/lib/constants/room-states";
-import { User, Room } from "@/app/lib/types";
+import { User, Room, RoomStatus } from "@/app/lib/types";
+import { Button } from "@/app/components/ui/button";
 
 // const ESTADOS = {
 //   available: { label: 'Disponible', icon: <Check className="h-4 w-4" />, color: 'bg-green-500 text-white' },
@@ -70,7 +71,10 @@ import { User, Room } from "@/app/lib/types";
 //   },
 // };
 
-const ESTADOS = Object.entries(ROOM_STATES).reduce(
+const ESTADOS: Record<
+  string,
+  { label: string; icon: JSX.Element; color: string }
+> = Object.entries(ROOM_STATES).reduce(
   (acc, [key, value]) => ({
     ...acc,
     [key]: {
@@ -86,9 +90,10 @@ export default function HotelDashboard() {
   const { user } = useAuth() as { user: User | null };
   const [habitaciones, setHabitaciones] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // const [error, setError] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [pisoSeleccionado, setPisoSeleccionado] = useState("todos");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -110,13 +115,13 @@ export default function HotelDashboard() {
           },
           (error) => {
             console.error("Error escuchando cambios:", error);
-            setError(error.message);
+            setError((error as any).message);
             setIsLoading(false);
           }
         );
       } catch (error) {
         console.error("Error al configurar listener:", error);
-        setError(error.message);
+        setError((error as any).message);
         setIsLoading(false);
       }
     }
@@ -125,11 +130,11 @@ export default function HotelDashboard() {
   }, [user]);
 
   const contadoresTotales = useMemo(() => {
-    return habitaciones.reduce((acc, habitacion) => {
+    return habitaciones.reduce((acc: Record<string, number>, habitacion) => {
       const estado = habitacion.status || "available";
       acc[estado] = (acc[estado] || 0) + 1;
       return acc;
-    }, {});
+    }, {} as Record<string, number>);
   }, [habitaciones]);
 
   const pisosUnicos = useMemo(() => {
@@ -154,13 +159,13 @@ export default function HotelDashboard() {
   }, [habitaciones, pisoSeleccionado, busqueda, estadoFiltrado]);
 
   // Calcular contadores por estado
-  const contadores = useMemo(() => {
-    return habitacionesFiltradas.reduce((acc, habitacion) => {
-      const estado = habitacion.status || "available";
-      acc[estado] = (acc[estado] || 0) + 1;
-      return acc;
-    }, {});
-  }, [habitacionesFiltradas]);
+  // const contadores = useMemo(() => {
+  //   return habitacionesFiltradas.reduce((acc, habitacion) => {
+  //     const estado = habitacion.status || "available";
+  //     acc[estado] = (acc[estado] || 0) + 1;
+  //     return acc;
+  //   }, {});
+  // }, [habitacionesFiltradas]);
 
   return (
     <div className="p-4">
@@ -253,13 +258,13 @@ export default function HotelDashboard() {
                   {ESTADOS[estadoFiltrado]?.label}
                 </span>
               </div>
-              <button
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setEstadoFiltrado("todos")}
               >
                 Mostrar todas
-              </button>
+              </Button>
             </div>
           )}
         </CardHeader>

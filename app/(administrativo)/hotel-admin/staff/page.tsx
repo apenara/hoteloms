@@ -1,15 +1,15 @@
 // src/app/hotel-admin/staff/page.tsx
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/auth';
-import { deleteStaffMember } from '@/lib/firebase/user-management';
-import { db } from '@/lib/firebase/config';
-import { collection, query, getDocs } from 'firebase/firestore';
-import { AddStaffDialog } from '@/components/staff/AddStaffDialog';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
+import { deleteStaffMember } from "@/lib/firebase/user-management";
+import { db } from "@/lib/firebase/config";
+import { collection, query, getDocs } from "firebase/firestore";
+import { AddStaffDialog } from "@/components/staff/AddStaffDialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 // import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Table,
@@ -28,14 +28,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { PinManagement } from '@/components/staff/PinManagement';
-import { Loader2, UserPlus, Key, Trash2, Ban } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+} from "@/components/ui/table";
+import { PinManagement } from "@/components/staff/PinManagement";
+import { Loader2, UserPlus, Key, Trash2, Ban } from "lucide-react";
+import { useToast } from "@/app/hooks/use-toast";
 
 export default function StaffPage() {
   const { user } = useAuth();
-  const { toast } = useToast(); 
+  const { toast } = useToast();
   const [staffMembers, setStaffMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState(null);
@@ -50,19 +50,19 @@ export default function StaffPage() {
       if (!user?.hotelId) return;
 
       try {
-        const staffRef = collection(db, 'hotels', user.hotelId, 'staff');
+        const staffRef = collection(db, "hotels", user.hotelId, "staff");
         const staffSnapshot = await getDocs(staffRef);
-        const staffData = staffSnapshot.docs.map(doc => ({
+        const staffData = staffSnapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         }));
         setStaffMembers(staffData);
       } catch (error) {
-        console.error('Error fetching staff:', error);
+        console.error("Error fetching staff:", error);
         toast({
           title: "Error",
           description: "No se pudo cargar el personal",
-          variant: "destructive"
+          variant: "destructive",
         });
       } finally {
         setLoading(false);
@@ -83,17 +83,17 @@ export default function StaffPage() {
         selectedStaff.userId
       );
 
-      setRefreshTrigger(prev => prev + 1);
+      setRefreshTrigger((prev) => prev + 1);
       toast({
         title: "Éxito",
-        description: "Personal eliminado correctamente"
+        description: "Personal eliminado correctamente",
       });
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Error al eliminar el personal",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setDeleteLoading(false);
@@ -113,17 +113,17 @@ export default function StaffPage() {
         selectedStaff.userId
       );
 
-      setRefreshTrigger(prev => prev + 1);
+      setRefreshTrigger((prev) => prev + 1);
       toast({
         title: "Éxito",
-        description: "Personal suspendido correctamente"
+        description: "Personal suspendido correctamente",
       });
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Error al suspender el personal",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setDeleteLoading(false);
@@ -134,11 +134,11 @@ export default function StaffPage() {
 
   const getRoleBadgeColor = (role) => {
     const colors = {
-      housekeeper: 'bg-blue-100 text-blue-800',
-      maintenance: 'bg-yellow-100 text-yellow-800',
-      manager: 'bg-purple-100 text-purple-800'
+      housekeeper: "bg-blue-100 text-blue-800",
+      maintenance: "bg-yellow-100 text-yellow-800",
+      manager: "bg-purple-100 text-purple-800",
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] || "bg-gray-100 text-gray-800";
   };
 
   if (loading) {
@@ -182,9 +182,13 @@ export default function StaffPage() {
                       {staff.role}
                     </Badge>
                   </TableCell>
-                  <TableCell>{staff.email || 'N/A'}</TableCell>
+                  <TableCell>{staff.email || "N/A"}</TableCell>
                   <TableCell>
-                    <Badge variant={staff.status === 'active' ? 'default' : 'secondary'}>
+                    <Badge
+                      variant={
+                        staff.status === "active" ? "default" : "secondary"
+                      }
+                    >
                       {staff.status}
                     </Badge>
                   </TableCell>
@@ -212,8 +216,6 @@ export default function StaffPage() {
                       >
                         <Ban className="h-4 w-4" />
                       </Button>
-                        
-                      
                     </div>
                   </TableCell>
                 </TableRow>
@@ -228,7 +230,7 @@ export default function StaffPage() {
           isOpen={showAddStaff}
           onClose={() => setShowAddStaff(false)}
           onSuccess={() => {
-            setRefreshTrigger(prev => prev + 1);
+            setRefreshTrigger((prev) => prev + 1);
             setShowAddStaff(false);
           }}
         />
@@ -250,18 +252,21 @@ export default function StaffPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción suspenderá al miembro del personal{' '}
-              <strong>{selectedStaff?.name}</strong>. El usuario no podrá acceder al sistema hasta que sea reactivado.
+              Esta acción suspenderá al miembro del personal{" "}
+              <strong>{selectedStaff?.name}</strong>. El usuario no podrá
+              acceder al sistema hasta que sea reactivado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteLoading}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSuspend}
               disabled={deleteLoading}
               className="bg-yellow-600 hover:bg-yellow-700"
             >
-              {deleteLoading ? 'Suspendiendo...' : 'Suspender'}
+              {deleteLoading ? "Suspendiendo..." : "Suspender"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
