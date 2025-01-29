@@ -30,6 +30,7 @@ import { RoomCard } from "@/components/hotels/RoomCard";
 // import { RequestNotifications } from '@/components/dashboard/RequestNotifications';
 import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
 import { ROOM_STATES } from "@/app/lib/constants/room-states";
+import { User, Room } from "@/app/lib/types";
 
 // const ESTADOS = {
 //   available: { label: 'Disponible', icon: <Check className="h-4 w-4" />, color: 'bg-green-500 text-white' },
@@ -82,8 +83,8 @@ const ESTADOS = Object.entries(ROOM_STATES).reduce(
 );
 
 export default function HotelDashboard() {
-  const { user } = useAuth();
-  const [habitaciones, setHabitaciones] = useState([]);
+  const { user } = useAuth() as { user: User | null };
+  const [habitaciones, setHabitaciones] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busqueda, setBusqueda] = useState("");
@@ -92,19 +93,18 @@ export default function HotelDashboard() {
   useEffect(() => {
     let unsubscribe = () => {};
 
-    if (user?.hotelId) {
+    if (user && user.hotelId) {
       try {
         const habitacionesRef = collection(db, "hotels", user.hotelId, "rooms");
         const q = query(habitacionesRef);
 
-        // Suscribirse a cambios en tiempo real
         unsubscribe = onSnapshot(
           q,
           (snapshot) => {
             const habitacionesData = snapshot.docs.map((doc) => ({
               id: doc.id,
               ...doc.data(),
-            }));
+            })) as Room[];
             setHabitaciones(habitacionesData);
             setIsLoading(false);
           },
@@ -121,14 +121,9 @@ export default function HotelDashboard() {
       }
     }
 
-    // Limpiar el listener cuando el componente se desmonte
     return () => unsubscribe();
   }, [user]);
 
-  // Ya no necesitamos fetchHabitaciones porque los cambios son en tiempo real
-  const handleStatusChange = () => {
-    // Esta función ahora está vacía porque los cambios se actualizan automáticamente
-  };
   const contadoresTotales = useMemo(() => {
     return habitaciones.reduce((acc, habitacion) => {
       const estado = habitacion.status || "available";
