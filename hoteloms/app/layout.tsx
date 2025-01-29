@@ -17,12 +17,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-        <AuthProvider>
 
       <body className={`${inter.className} antialiased`}>
+        <AuthProvider>
       {children}
-      </body>
       </AuthProvider>
+      </body>
     </html>
   )
 }
