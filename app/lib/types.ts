@@ -1,23 +1,30 @@
 // src/lib/types.ts
-import { Timestamp } from 'firebase/firestore';
-import { ROOM_STATES, CLEANING_FLOWS } from './constants/room-states';
+import { Timestamp } from "firebase/firestore";
+import { ROOM_STATES, CLEANING_FLOWS } from "./constants/room-states";
 
 // Tipos de usuarios
-export type UserRole = 'super_admin' | 'hotel_admin' | 'staff';
-export type StaffRole = 'housekeeper' | 'maintenance' | 'manager' | 'supervisor';
-export type UserStatus = 'active' | 'inactive';
+export type UserRole = "super_admin" | "hotel_admin" | "staff";
+export type StaffRole =
+  | "housekeeper"
+  | "maintenance"
+  | "manager"
+  | "supervisor";
+export type UserStatus = "active" | "inactive";
 
 // Tipos de habitaciones
 export type RoomStatus = keyof typeof ROOM_STATES;
-export type RoomType = 'single' | 'double' | 'suite' | 'presidential';
+export type RoomType = "single" | "double" | "suite" | "presidential";
 export type CleaningFlow = keyof typeof CLEANING_FLOWS;
 
 // Tipos para mantenimiento
-export type MaintenanceType = 'preventive' | 'corrective';
-export type MaintenanceStatus = 'pending' | 'in_progress' | 'completed';
-export type MaintenancePriority = 'low' | 'medium' | 'high';
-export type MaintenanceCategory = 'room' | 'common_area' | 'equipment' | 'facility';
-
+export type MaintenanceType = "preventive" | "corrective";
+export type MaintenanceStatus = "pending" | "in_progress" | "completed";
+export type MaintenancePriority = "low" | "medium" | "high";
+export type MaintenanceCategory =
+  | "room"
+  | "common_area"
+  | "equipment"
+  | "facility";
 
 export interface Room {
   id: string;
@@ -67,7 +74,7 @@ export interface Hotel {
   email: string;
   phone: string;
   address: string;
-  status: 'trial' | 'active' | 'suspended';
+  status: "trial" | "active" | "suspended";
   trialEndsAt: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -83,7 +90,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  hotelId?: string;
+  hotelId: string; // Asegúrate de que hotelId esté definido aquí
   createdAt: Timestamp;
   lastLogin: Timestamp;
   status: UserStatus;
