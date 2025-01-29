@@ -1,7 +1,8 @@
-import type { NextConfig } from "next";
+// @ts-check
 
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   /* config options here */
 };
 
-export default nextConfig;
+module.exports = nextConfig;
