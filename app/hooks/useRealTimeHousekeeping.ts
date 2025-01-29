@@ -1,16 +1,16 @@
 // src/hooks/useRealTimeHousekeeping.ts
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
+import { useState, useEffect, useCallback } from "react";
+import {
+  collection,
+  query,
+  where,
   orderBy,
   onSnapshot,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import type { Staff, Room } from '@/lib/types';
-import { startOfDay, endOfDay } from 'date-fns';
+  // Timestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import type { Staff, Room } from "@/app/lib/types";
+import { startOfDay, endOfDay } from "date-fns";
 
 interface UseRealTimeHousekeepingProps {
   hotelId: string;
@@ -27,85 +27,102 @@ interface EstadisticasGlobales {
   tiempoPromedioGlobal: number;
 }
 
-export const useRealTimeHousekeeping = ({ 
+export const useRealTimeHousekeeping = ({
   hotelId,
-  selectedDate = new Date()
+  selectedDate = new Date(),
 }: UseRealTimeHousekeepingProps) => {
   const [camareras, setCamareras] = useState<Staff[]>([]);
   const [habitaciones, setHabitaciones] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [estadisticasGlobales, setEstadisticasGlobales] = useState<EstadisticasGlobales>({
-    total: 0,
-    completadas: 0,
-    enProgreso: 0,
-    pendientes: 0,
-    inspeccion: 0,
-    eficienciaGlobal: 0,
-    tiempoPromedioGlobal: 0
-  });
-
-  // Función para calcular estadísticas
-  const calcularEstadisticas = useCallback((
-    habitacionesFiltradas: Room[], 
-    staffList: Staff[]
-  ): EstadisticasGlobales => {
-    const startOfSelectedDay = startOfDay(selectedDate);
-    const endOfSelectedDay = endOfDay(selectedDate);
-
-    // Filtrar habitaciones del día
-    const habitacionesDelDia = habitacionesFiltradas.filter(h => {
-      if (!h.lastStatusChange) return false;
-      const fecha = h.lastStatusChange.toDate();
-      return fecha >= startOfSelectedDay && fecha <= endOfSelectedDay;
+  const [estadisticasGlobales, setEstadisticasGlobales] =
+    useState<EstadisticasGlobales>({
+      total: 0,
+      completadas: 0,
+      enProgreso: 0,
+      pendientes: 0,
+      inspeccion: 0,
+      eficienciaGlobal: 0,
+      tiempoPromedioGlobal: 0,
     });
 
-    // Contadores básicos
-    const contadores = {
-      total: habitacionesDelDia.length,
-      completadas: habitacionesDelDia.filter(h => h.status === 'available').length,
-      enProgreso: habitacionesDelDia.filter(h => 
-        ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'].includes(h.status)
-      ).length,
-      pendientes: habitacionesDelDia.filter(h => 
-        ['need_cleaning', 'checkout'].includes(h.status)
-      ).length,
-      inspeccion: habitacionesDelDia.filter(h => h.status === 'inspection').length
-    };
+  // Función para calcular estadísticas
+  const calcularEstadisticas = useCallback(
+    (
+      habitacionesFiltradas: Room[],
+      staffList: Staff[]
+    ): EstadisticasGlobales => {
+      const startOfSelectedDay = startOfDay(selectedDate);
+      const endOfSelectedDay = endOfDay(selectedDate);
 
-    // Cálculo de eficiencia global
-    const eficienciasPorCamarera = staffList
-      .map(camarera => {
-        const habitacionesCamarera = habitacionesDelDia.filter(h => h.assignedTo === camarera.id);
-        if (!habitacionesCamarera.length) return 0;
-        return (habitacionesCamarera.filter(h => h.status === 'available').length / habitacionesCamarera.length) * 100;
-      })
-      .filter(eficiencia => eficiencia > 0);
+      // Filtrar habitaciones del día
+      const habitacionesDelDia = habitacionesFiltradas.filter((h) => {
+        if (!h.lastStatusChange) return false;
+        const fecha = h.lastStatusChange.toDate();
+        return fecha >= startOfSelectedDay && fecha <= endOfSelectedDay;
+      });
 
-    const eficienciaGlobal = eficienciasPorCamarera.length
-      ? eficienciasPorCamarera.reduce((acc, curr) => acc + curr, 0) / eficienciasPorCamarera.length
-      : 0;
+      // Contadores básicos
+      const contadores = {
+        total: habitacionesDelDia.length,
+        completadas: habitacionesDelDia.filter((h) => h.status === "available")
+          .length,
+        enProgreso: habitacionesDelDia.filter((h) =>
+          ["cleaning_occupied", "cleaning_checkout", "cleaning_touch"].includes(
+            h.status
+          )
+        ).length,
+        pendientes: habitacionesDelDia.filter((h) =>
+          ["need_cleaning", "checkout"].includes(h.status)
+        ).length,
+        inspeccion: habitacionesDelDia.filter((h) => h.status === "inspection")
+          .length,
+      };
 
-    // Cálculo de tiempo promedio
-    const tiemposLimpieza = habitacionesDelDia
-      .filter(h => h.tiempoLimpieza && h.tiempoLimpieza > 0)
-      .map(h => h.tiempoLimpieza || 0);
+      // Cálculo de eficiencia global
+      const eficienciasPorCamarera = staffList
+        .map((camarera) => {
+          const habitacionesCamarera = habitacionesDelDia.filter(
+            (h) => h.assignedTo === camarera.id
+          );
+          if (!habitacionesCamarera.length) return 0;
+          return (
+            (habitacionesCamarera.filter((h) => h.status === "available")
+              .length /
+              habitacionesCamarera.length) *
+            100
+          );
+        })
+        .filter((eficiencia) => eficiencia > 0);
 
-    const tiempoPromedioGlobal = tiemposLimpieza.length
-      ? tiemposLimpieza.reduce((acc, curr) => acc + curr, 0) / tiemposLimpieza.length
-      : 0;
+      const eficienciaGlobal = eficienciasPorCamarera.length
+        ? eficienciasPorCamarera.reduce((acc, curr) => acc + curr, 0) /
+          eficienciasPorCamarera.length
+        : 0;
 
-    return {
-      ...contadores,
-      eficienciaGlobal,
-      tiempoPromedioGlobal
-    };
-  }, [selectedDate]);
+      // Cálculo de tiempo promedio
+      const tiemposLimpieza = habitacionesDelDia
+        .filter((h) => h.tiempoLimpieza && h.tiempoLimpieza > 0)
+        .map((h) => h.tiempoLimpieza || 0);
+
+      const tiempoPromedioGlobal = tiemposLimpieza.length
+        ? tiemposLimpieza.reduce((acc, curr) => acc + curr, 0) /
+          tiemposLimpieza.length
+        : 0;
+
+      return {
+        ...contadores,
+        eficienciaGlobal,
+        tiempoPromedioGlobal,
+      };
+    },
+    [selectedDate]
+  );
 
   // Efecto para las suscripciones en tiempo real
   useEffect(() => {
     if (!hotelId) {
-      setError('Hotel ID no proporcionado');
+      setError("Hotel ID no proporcionado");
       setLoading(false);
       return;
     }
@@ -114,44 +131,46 @@ export const useRealTimeHousekeeping = ({
     setError(null);
 
     // Queries
-    const staffRef = collection(db, 'hotels', hotelId, 'staff');
+    const staffRef = collection(db, "hotels", hotelId, "staff");
     const staffQuery = query(
       staffRef,
-      where('role', '==', 'housekeeper'),
-      where('status', '==', 'active'),
-      orderBy('name')
+      where("role", "==", "housekeeper"),
+      where("status", "==", "active"),
+      orderBy("name")
     );
 
-    const roomsRef = collection(db, 'hotels', hotelId, 'rooms');
+    const roomsRef = collection(db, "hotels", hotelId, "rooms");
     const roomsQuery = query(roomsRef);
 
     // Suscripciones
-    const unsubscribeStaff = onSnapshot(staffQuery, 
+    const unsubscribeStaff = onSnapshot(
+      staffQuery,
       (snapshot) => {
-        const staffData = snapshot.docs.map(doc => ({
+        const staffData = snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         })) as Staff[];
         setCamareras(staffData);
       },
       (error) => {
-        console.error('Error en snapshot de camareras:', error);
-        setError('Error al obtener datos de camareras');
+        console.error("Error en snapshot de camareras:", error);
+        setError("Error al obtener datos de camareras");
       }
     );
 
-    const unsubscribeRooms = onSnapshot(roomsQuery,
+    const unsubscribeRooms = onSnapshot(
+      roomsQuery,
       (snapshot) => {
-        const roomsData = snapshot.docs.map(doc => ({
+        const roomsData = snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         })) as Room[];
         setHabitaciones(roomsData);
         setLoading(false);
       },
       (error) => {
-        console.error('Error en snapshot de habitaciones:', error);
-        setError('Error al obtener datos de habitaciones');
+        console.error("Error en snapshot de habitaciones:", error);
+        setError("Error al obtener datos de habitaciones");
         setLoading(false);
       }
     );
@@ -175,6 +194,6 @@ export const useRealTimeHousekeeping = ({
     habitaciones,
     estadisticasGlobales,
     loading,
-    error
+    error,
   };
 };

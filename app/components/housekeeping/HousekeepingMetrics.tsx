@@ -1,7 +1,7 @@
 // src/components/housekeeping/HousekeepingMetrics.tsx
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -21,20 +21,20 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
-} from 'recharts';
-import type { Staff, Room } from '@/lib/types';
-import { 
-  Clock, 
-  TrendingUp, 
-  Zap, 
+  Cell,
+} from "recharts";
+import type { Staff, Room } from "@/app/lib/types";
+import {
+  Clock,
+  TrendingUp,
+  Zap,
   ArrowUpDown,
   BarChart3,
   Timer,
   Activity,
   CheckCircle,
-  AlertTriangle
-} from 'lucide-react';
+  AlertTriangle,
+} from "lucide-react";
 
 interface HousekeepingMetricsProps {
   camareras: Staff[];
@@ -45,21 +45,22 @@ interface HousekeepingMetricsProps {
 export function HousekeepingMetrics({
   camareras,
   habitaciones,
-  estadisticasGlobales
+  estadisticasGlobales,
 }: HousekeepingMetricsProps) {
-  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('hoy');
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState("hoy");
 
   // Calcular KPIs principales
   const calcularKPIs = () => {
     const tiemposLimpieza = habitaciones
-      .filter(h => h.tiempoLimpieza && h.tiempoLimpieza > 0)
-      .map(h => h.tiempoLimpieza || 0);
+      .filter((h) => h.tiempoLimpieza && h.tiempoLimpieza > 0)
+      .map((h) => h.tiempoLimpieza || 0);
 
     const tiempoTotal = tiemposLimpieza.reduce((acc, curr) => acc + curr, 0);
-    const tiempoPromedio = tiemposLimpieza.length > 0 ? tiempoTotal / tiemposLimpieza.length : 0;
+    const tiempoPromedio =
+      tiemposLimpieza.length > 0 ? tiempoTotal / tiemposLimpieza.length : 0;
 
     // Calcular retrasos
-    const habitacionesRetrasadas = habitaciones.filter(h => {
+    const habitacionesRetrasadas = habitaciones.filter((h) => {
       if (!h.lastStatusChange || !h.tiempoLimpieza) return false;
       const tiempoEsperado = getTiempoEsperado(h.status);
       return h.tiempoLimpieza > tiempoEsperado;
@@ -70,9 +71,12 @@ export function HousekeepingMetrics({
       eficienciaGlobal: estadisticasGlobales.eficienciaGlobal,
       totalLimpiezas: tiemposLimpieza.length,
       retrasos: habitacionesRetrasadas.length,
-      ocupacionCamareras: (camareras.filter(c => 
-        habitaciones.some(h => h.assignedTo === c.id)
-      ).length / camareras.length) * 100
+      ocupacionCamareras:
+        (camareras.filter((c) =>
+          habitaciones.some((h) => h.assignedTo === c.id)
+        ).length /
+          camareras.length) *
+        100,
     };
   };
 
@@ -82,33 +86,37 @@ export function HousekeepingMetrics({
       cleaning_checkout: 45,
       cleaning_occupied: 30,
       cleaning_touch: 15,
-      default: 30
+      default: 30,
     };
     return tiempos[tipo as keyof typeof tiempos] || tiempos.default;
   };
 
   // Calcular eficiencia por camarera
   const getEficienciaPorCamarera = () => {
-    return camareras.map(camarera => {
-      const habitacionesCamarera = habitaciones.filter(h => h.assignedTo === camarera.id);
-      const eficiencia = camarera.efficiency || 0;
-      const tiempoPromedio = camarera.tiempoPromedio || 0;
+    return camareras
+      .map((camarera) => {
+        const habitacionesCamarera = habitaciones.filter(
+          (h) => h.assignedTo === camarera.id
+        );
+        const eficiencia = camarera.efficiency || 0;
+        const tiempoPromedio = camarera.tiempoPromedio || 0;
 
-      return {
-        nombre: camarera.name,
-        eficiencia,
-        tiempoPromedio,
-        habitaciones: habitacionesCamarera.length,
-        color: getColorPorEficiencia(eficiencia)
-      };
-    }).sort((a, b) => b.eficiencia - a.eficiencia);
+        return {
+          nombre: camarera.name,
+          eficiencia,
+          tiempoPromedio,
+          habitaciones: habitacionesCamarera.length,
+          color: getColorPorEficiencia(eficiencia),
+        };
+      })
+      .sort((a, b) => b.eficiencia - a.eficiencia);
   };
 
   // Función para determinar el color según la eficiencia
   const getColorPorEficiencia = (eficiencia: number): string => {
-    if (eficiencia >= 90) return '#10b981';
-    if (eficiencia >= 70) return '#f59e0b';
-    return '#ef4444';
+    if (eficiencia >= 90) return "#10b981";
+    if (eficiencia >= 70) return "#f59e0b";
+    return "#ef4444";
   };
 
   const kpis = calcularKPIs();
@@ -118,7 +126,10 @@ export function HousekeepingMetrics({
     <div className="space-y-6">
       {/* Filtro de Período */}
       <div className="flex justify-end">
-        <Select value={periodoSeleccionado} onValueChange={setPeriodoSeleccionado}>
+        <Select
+          value={periodoSeleccionado}
+          onValueChange={setPeriodoSeleccionado}
+        >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Seleccionar período" />
           </SelectTrigger>
@@ -143,9 +154,7 @@ export function HousekeepingMetrics({
             <div className="text-2xl font-bold">
               {Math.round(kpis.tiempoPromedio)}min
             </div>
-            <div className="text-xs text-muted-foreground">
-              Por habitación
-            </div>
+            <div className="text-xs text-muted-foreground">Por habitación</div>
           </CardContent>
         </Card>
 
@@ -239,7 +248,7 @@ export function HousekeepingMetrics({
         <CardContent>
           <div className="space-y-4">
             {eficienciaPorCamarera.map((camarera, index) => (
-              <div 
+              <div
                 key={index}
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
               >
@@ -259,17 +268,15 @@ export function HousekeepingMetrics({
                     <div className="font-medium">
                       {Math.round(camarera.tiempoPromedio)}min
                     </div>
-                    <div className="text-sm text-gray-500">
-                      promedio
-                    </div>
+                    <div className="text-sm text-gray-500">promedio</div>
                   </div>
-                  <Badge 
+                  <Badge
                     className={`px-2 py-1 ${
-                      camarera.eficiencia >= 90 
-                        ? 'bg-green-100 text-green-800'
+                      camarera.eficiencia >= 90
+                        ? "bg-green-100 text-green-800"
                         : camarera.eficiencia >= 70
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-red-100 text-red-800"
                     }`}
                   >
                     {Math.round(camarera.eficiencia)}%

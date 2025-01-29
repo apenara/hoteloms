@@ -1,5 +1,5 @@
 // src/components/housekeeping/HousekeepingHistory.tsx
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
@@ -8,11 +8,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover,
   PopoverContent,
@@ -26,53 +26,50 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  CalendarDays, 
-  Clock, 
-  Filter, 
+import {
+  CalendarDays,
+  Clock,
+  Filter,
   User,
   Search,
   SortAsc,
-  SortDesc 
-} from 'lucide-react';
-import type { Staff, Room } from '@/lib/types';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { ROOM_STATES } from '@/app/lib/constants/room-states';
-
-
+  SortDesc,
+} from "lucide-react";
+import type { Staff, Room } from "@/app/lib/types";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { ROOM_STATES } from "@/app/lib/constants/room-states";
 
 interface HousekeepingHistoryProps {
   camareras: Staff[];
   habitaciones: Room[];
 }
 
-export function HousekeepingHistory({ 
-    
-    camareras, 
-    habitaciones 
-  }: HousekeepingHistoryProps) {
-    const [dateRange, setDateRange] = useState<{
-      from: Date | undefined;
-      to: Date | undefined;
-    }>({
-      from: undefined,
-      to: undefined,
-    });
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedStaff, setSelectedStaff] = useState<string>('all');
-    const [selectedType, setSelectedType] = useState<string>('all');
-    const [sortConfig, setSortConfig] = useState({
-      key: 'fecha',
-      direction: 'desc' as 'asc' | 'desc'
-    });
+export function HousekeepingHistory({
+  camareras,
+  habitaciones,
+}: HousekeepingHistoryProps) {
+  const [dateRange, setDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({
+    from: undefined,
+    to: undefined,
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStaff, setSelectedStaff] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [sortConfig, setSortConfig] = useState({
+    key: "fecha",
+    direction: "desc" as "asc" | "desc",
+  });
 
   // Generar historial de ejemplo (reemplazar con datos reales)
   const generateHistoryData = () => {
-    const history = habitaciones.flatMap(room => {
+    const history = habitaciones.flatMap((room) => {
       if (!room.lastStatusChange) return [];
-      
-      const staff = camareras.find(c => c.id === room.assignedTo);
+
+      const staff = camareras.find((c) => c.id === room.assignedTo);
       if (!staff) return [];
 
       return {
@@ -96,38 +93,41 @@ export function HousekeepingHistory({
     const tiemposEsperados = {
       cleaning_checkout: 45,
       cleaning_occupied: 30,
-      cleaning_touch: 15
+      cleaning_touch: 15,
     };
 
-    const tiempoEsperado = tiemposEsperados[room.status as keyof typeof tiemposEsperados] || 30;
+    const tiempoEsperado =
+      tiemposEsperados[room.status as keyof typeof tiemposEsperados] || 30;
     return Math.min(100, (tiempoEsperado / room.tiempoLimpieza) * 100);
   };
 
   const getStatusColor = (status: string): string => {
     const colors = {
-      cleaning_checkout: 'bg-red-100 text-red-800',
-      cleaning_occupied: 'bg-blue-100 text-blue-800',
-      cleaning_touch: 'bg-green-100 text-green-800',
-      available: 'bg-purple-100 text-purple-800',
-      inspection: 'bg-yellow-100 text-yellow-800'
+      cleaning_checkout: "bg-red-100 text-red-800",
+      cleaning_occupied: "bg-blue-100 text-blue-800",
+      cleaning_touch: "bg-green-100 text-green-800",
+      available: "bg-purple-100 text-purple-800",
+      inspection: "bg-yellow-100 text-yellow-800",
     };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800";
   };
 
   const filterData = (data: any[]) => {
-    return data.filter(item => {
+    return data.filter((item) => {
       // Filtro por rango de fechas
-      const dateInRange = (!dateRange.from || item.fecha >= dateRange.from) &&
-                         (!dateRange.to || item.fecha <= dateRange.to);
-      
+      const dateInRange =
+        (!dateRange.from || item.fecha >= dateRange.from) &&
+        (!dateRange.to || item.fecha <= dateRange.to);
+
       // Filtro por búsqueda
-      const searchMatch = !searchTerm || 
+      const searchMatch =
+        !searchTerm ||
         item.habitacion.toString().includes(searchTerm) ||
         item.camarera.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       // Filtro por camarera
       const staffMatch = !selectedStaff || item.camarera === selectedStaff;
-      
+
       // Filtro por tipo
       const typeMatch = !selectedType || item.estado === selectedType;
 
@@ -137,26 +137,27 @@ export function HousekeepingHistory({
 
   const sortData = (data: any[]) => {
     return [...data].sort((a, b) => {
-      if (sortConfig.key === 'fecha') {
-        return sortConfig.direction === 'asc' 
+      if (sortConfig.key === "fecha") {
+        return sortConfig.direction === "asc"
           ? a.fecha.getTime() - b.fecha.getTime()
           : b.fecha.getTime() - a.fecha.getTime();
       }
-      
+
       if (a[sortConfig.key] < b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
+        return sortConfig.direction === "asc" ? -1 : 1;
       }
       if (a[sortConfig.key] > b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
+        return sortConfig.direction === "asc" ? 1 : -1;
       }
       return 0;
     });
   };
 
   const handleSort = (key: string) => {
-    setSortConfig(current => ({
+    setSortConfig((current) => ({
       key,
-      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+      direction:
+        current.key === key && current.direction === "asc" ? "desc" : "asc",
     }));
   };
 
@@ -175,14 +176,14 @@ export function HousekeepingHistory({
                   {dateRange.from ? (
                     dateRange.to ? (
                       <>
-                        {format(dateRange.from, 'dd/MM/yy')} -{' '}
-                        {format(dateRange.to, 'dd/MM/yy')}
+                        {format(dateRange.from, "dd/MM/yy")} -{" "}
+                        {format(dateRange.to, "dd/MM/yy")}
                       </>
                     ) : (
-                      format(dateRange.from, 'dd/MM/yy')
+                      format(dateRange.from, "dd/MM/yy")
                     )
                   ) : (
-                    'Seleccionar fechas'
+                    "Seleccionar fechas"
                   )}
                 </Button>
               </PopoverTrigger>
@@ -204,8 +205,8 @@ export function HousekeepingHistory({
                 <SelectValue placeholder="Filtrar por camarera" />
               </SelectTrigger>
               <SelectContent>
-              <SelectItem value="all">Todas las camareras</SelectItem>
-                {camareras.map(staff => (
+                <SelectItem value="all">Todas las camareras</SelectItem>
+                {camareras.map((staff) => (
                   <SelectItem key={staff.id} value={staff.name}>
                     {staff.name}
                   </SelectItem>
@@ -244,12 +245,18 @@ export function HousekeepingHistory({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('fecha')}>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => handleSort("fecha")}
+                >
                   <div className="flex items-center gap-1">
                     Fecha/Hora
-                    {sortConfig.key === 'fecha' && (
-                      sortConfig.direction === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />
-                    )}
+                    {sortConfig.key === "fecha" &&
+                      (sortConfig.direction === "asc" ? (
+                        <SortAsc className="h-4 w-4" />
+                      ) : (
+                        <SortDesc className="h-4 w-4" />
+                      ))}
                   </div>
                 </TableHead>
                 <TableHead>Habitación</TableHead>
@@ -263,12 +270,10 @@ export function HousekeepingHistory({
               {historyData.map((record, index) => (
                 <TableRow key={index}>
                   <TableCell>
-                    {format(record.fecha, 'dd/MM/yy HH:mm')}
+                    {format(record.fecha, "dd/MM/yy HH:mm")}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">
-                      {record.habitacion}
-                    </Badge>
+                    <Badge variant="outline">{record.habitacion}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(record.estado)}>
@@ -288,11 +293,15 @@ export function HousekeepingHistory({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={
-                      record.eficiencia >= 90 ? 'bg-green-100 text-green-800' :
-                      record.eficiencia >= 70 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }>
+                    <Badge
+                      className={
+                        record.eficiencia >= 90
+                          ? "bg-green-100 text-green-800"
+                          : record.eficiencia >= 70
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                      }
+                    >
                       {Math.round(record.eficiencia)}%
                     </Badge>
                   </TableCell>

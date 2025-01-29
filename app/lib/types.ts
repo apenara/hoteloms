@@ -115,6 +115,7 @@ export interface Maintenance {
   images?: string[];
   rating?: number;
   feedback?: string;
+  assignedTo?: string;
 }
 
 export interface StaffPerformanceMetrics {

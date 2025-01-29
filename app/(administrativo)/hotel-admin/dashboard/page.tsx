@@ -30,7 +30,7 @@ import { RoomCard } from "@/components/hotels/RoomCard";
 // import { RequestNotifications } from '@/components/dashboard/RequestNotifications';
 import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
 import { ROOM_STATES } from "@/app/lib/constants/room-states";
-import { User, Room, RoomStatus } from "@/app/lib/types";
+import { User, Room } from "@/app/lib/types";
 import { Button } from "@/app/components/ui/button";
 
 // const ESTADOS = {

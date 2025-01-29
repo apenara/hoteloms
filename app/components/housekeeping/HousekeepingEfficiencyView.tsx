@@ -1,18 +1,27 @@
 // src/components/housekeeping/HousekeepingEfficiencyView.tsx
-import React from 'react';
+import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead,
-  TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  CheckCircle, Clock, Home, AlertTriangle,
-  TrendingUp, Timer, ClipboardList
-} from 'lucide-react';
-import type { Staff, Room } from '@/lib/types';
-import { getTiempoTranscurrido } from '@/app/lib/utils/housekeeping';
+  CheckCircle,
+  Clock,
+  Home,
+  AlertTriangle,
+  TrendingUp,
+  Timer,
+  ClipboardList,
+} from "lucide-react";
+import type { Staff, Room } from "@/app/lib/types";
+import { getTiempoTranscurrido } from "@/app/lib/utils/housekeeping";
 
 interface HousekeepingEfficiencyViewProps {
   camareras: Staff[];
@@ -31,7 +40,7 @@ interface HousekeepingEfficiencyViewProps {
 const HousekeepingEfficiencyView = ({
   camareras,
   habitaciones,
-  estadisticasGlobales
+  estadisticasGlobales,
 }: HousekeepingEfficiencyViewProps) => {
   return (
     <div className="space-y-6">
@@ -97,11 +106,15 @@ const HousekeepingEfficiencyView = ({
                 Eficiencia Global
               </div>
               <div className="text-2xl font-bold">
-                <Badge className={
-                  estadisticasGlobales.eficienciaGlobal > 80 ? 'bg-green-100 text-green-800' :
-                    estadisticasGlobales.eficienciaGlobal > 50 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                }>
+                <Badge
+                  className={
+                    estadisticasGlobales.eficienciaGlobal > 80
+                      ? "bg-green-100 text-green-800"
+                      : estadisticasGlobales.eficienciaGlobal > 50
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-red-100 text-red-800"
+                  }
+                >
                   {estadisticasGlobales.eficienciaGlobal.toFixed(1)}%
                 </Badge>
               </div>
@@ -137,16 +150,25 @@ const HousekeepingEfficiencyView = ({
               </TableHeader>
               <TableBody>
                 {habitaciones
-                  .filter(h => ['cleaning', 'cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'].includes(h.status))
-                  .map(habitacion => {
-                    const camarera = camareras.find(c => c.id === habitacion.assignedTo);
+                  .filter((h) =>
+                    [
+                      "cleaning",
+                      "cleaning_occupied",
+                      "cleaning_checkout",
+                      "cleaning_touch",
+                    ].includes(h.status)
+                  )
+                  .map((habitacion) => {
+                    const camarera = camareras.find(
+                      (c) => c.id === habitacion.assignedTo
+                    );
                     return (
                       <TableRow key={habitacion.id}>
                         <TableCell>{habitacion.number}</TableCell>
                         <TableCell>
                           <RoomStatusBadge status={habitacion.status} />
                         </TableCell>
-                        <TableCell>{camarera?.name || 'No asignada'}</TableCell>
+                        <TableCell>{camarera?.name || "No asignada"}</TableCell>
                         <TableCell>
                           {getTiempoTranscurrido(habitacion.lastStatusChange)}
                         </TableCell>
@@ -165,29 +187,29 @@ const HousekeepingEfficiencyView = ({
 const RoomStatusBadge = ({ status }: { status: string }) => {
   const getStatusConfig = () => {
     switch (status) {
-      case 'cleaning_occupied':
+      case "cleaning_occupied":
         return {
-          label: 'Limpieza Ocupada',
-          className: 'bg-yellow-100 text-yellow-800',
-          icon: Clock
+          label: "Limpieza Ocupada",
+          className: "bg-yellow-100 text-yellow-800",
+          icon: Clock,
         };
-      case 'cleaning_checkout':
+      case "cleaning_checkout":
         return {
-          label: 'Limpieza Checkout',
-          className: 'bg-purple-100 text-purple-800',
-          icon: Home
+          label: "Limpieza Checkout",
+          className: "bg-purple-100 text-purple-800",
+          icon: Home,
         };
-      case 'cleaning_touch':
+      case "cleaning_touch":
         return {
-          label: 'Retoque',
-          className: 'bg-blue-100 text-blue-800',
-          icon: CheckCircle
+          label: "Retoque",
+          className: "bg-blue-100 text-blue-800",
+          icon: CheckCircle,
         };
       default:
         return {
-          label: 'En Limpieza',
-          className: 'bg-gray-100 text-gray-800',
-          icon: Clock
+          label: "En Limpieza",
+          className: "bg-gray-100 text-gray-800",
+          icon: Clock,
         };
     }
   };

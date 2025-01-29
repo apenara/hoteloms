@@ -1,7 +1,7 @@
 // src/components/housekeeping/HousekeepingStats.tsx
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   BarChart,
   Bar,
@@ -12,10 +12,10 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
-} from 'recharts';
-import type { Staff, Room } from '@/lib/types';
-import { BedDouble, Clock, CheckCircle, Timer, Users } from 'lucide-react';
+  Cell,
+} from "recharts";
+import type { Staff, Room } from "@/app/lib/types";
+import { BedDouble, Clock, CheckCircle, Timer, Users } from "lucide-react";
 
 interface HousekeepingStatsProps {
   camareras: Staff[];
@@ -23,10 +23,10 @@ interface HousekeepingStatsProps {
   estadisticasGlobales: any;
 }
 
-export function HousekeepingStats({ 
-  camareras, 
+export function HousekeepingStats({
+  camareras,
   habitaciones,
-  estadisticasGlobales 
+  estadisticasGlobales,
 }: HousekeepingStatsProps) {
   // Calcular estadísticas por tipo de limpieza
   const calcularEstadisticasPorTipo = () => {
@@ -35,40 +35,42 @@ export function HousekeepingStats({
         total: 0,
         tiempoPromedio: 0,
         completadas: 0,
-        enProgreso: 0
+        enProgreso: 0,
       },
       occupied: {
         total: 0,
         tiempoPromedio: 0,
         completadas: 0,
-        enProgreso: 0
+        enProgreso: 0,
       },
       touch: {
         total: 0,
         tiempoPromedio: 0,
         completadas: 0,
-        enProgreso: 0
-      }
+        enProgreso: 0,
+      },
     };
 
-    habitaciones.forEach(hab => {
-      if (hab.status === 'cleaning_checkout' || hab.lastStatusChange?.toDate().toDateString() === new Date().toDateString()) {
+    habitaciones.forEach((hab) => {
+      if (
+        hab.status === "cleaning_checkout" ||
+        hab.lastStatusChange?.toDate().toDateString() ===
+          new Date().toDateString()
+      ) {
         stats.checkout.total++;
-        if (hab.status === 'cleaning_checkout') stats.checkout.enProgreso++;
+        if (hab.status === "cleaning_checkout") stats.checkout.enProgreso++;
         if (hab.tiempoLimpieza) {
           stats.checkout.tiempoPromedio += hab.tiempoLimpieza;
           stats.checkout.completadas++;
         }
-      }
-      else if (hab.status === 'cleaning_occupied') {
+      } else if (hab.status === "cleaning_occupied") {
         stats.occupied.total++;
         stats.occupied.enProgreso++;
         if (hab.tiempoLimpieza) {
           stats.occupied.tiempoPromedio += hab.tiempoLimpieza;
           stats.occupied.completadas++;
         }
-      }
-      else if (hab.status === 'cleaning_touch') {
+      } else if (hab.status === "cleaning_touch") {
         stats.touch.total++;
         stats.touch.enProgreso++;
         if (hab.tiempoLimpieza) {
@@ -79,10 +81,10 @@ export function HousekeepingStats({
     });
 
     // Calcular promedios
-    ['checkout', 'occupied', 'touch'].forEach(tipo => {
+    ["checkout", "occupied", "touch"].forEach((tipo) => {
       if (stats[tipo as keyof typeof stats].completadas > 0) {
-        stats[tipo as keyof typeof stats].tiempoPromedio = 
-          stats[tipo as keyof typeof stats].tiempoPromedio / 
+        stats[tipo as keyof typeof stats].tiempoPromedio =
+          stats[tipo as keyof typeof stats].tiempoPromedio /
           stats[tipo as keyof typeof stats].completadas;
       }
     });
@@ -95,39 +97,39 @@ export function HousekeepingStats({
   // Datos para el gráfico de barras de tiempos promedio
   const tiemposPromedioData = [
     {
-      name: 'Check-out',
+      name: "Check-out",
       tiempo: Math.round(estadisticasPorTipo.checkout.tiempoPromedio || 0),
-      color: '#ef4444'
+      color: "#ef4444",
     },
     {
-      name: 'Ocupada',
+      name: "Ocupada",
       tiempo: Math.round(estadisticasPorTipo.occupied.tiempoPromedio || 0),
-      color: '#3b82f6'
+      color: "#3b82f6",
     },
     {
-      name: 'Retoque',
+      name: "Retoque",
       tiempo: Math.round(estadisticasPorTipo.touch.tiempoPromedio || 0),
-      color: '#10b981'
-    }
+      color: "#10b981",
+    },
   ];
 
   // Datos para el gráfico circular de distribución de estados
   const distribucionEstados = [
     {
-      name: 'Completadas',
+      name: "Completadas",
       value: estadisticasGlobales.completadas,
-      color: '#10b981'
+      color: "#10b981",
     },
     {
-      name: 'En Progreso',
+      name: "En Progreso",
       value: estadisticasGlobales.enProgreso,
-      color: '#3b82f6'
+      color: "#3b82f6",
     },
     {
-      name: 'Pendientes',
+      name: "Pendientes",
       value: estadisticasGlobales.pendientes,
-      color: '#ef4444'
-    }
+      color: "#ef4444",
+    },
   ];
 
   return (
@@ -140,12 +142,15 @@ export function HousekeepingStats({
             <BedDouble className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{estadisticasPorTipo.checkout.total}</div>
+            <div className="text-2xl font-bold">
+              {estadisticasPorTipo.checkout.total}
+            </div>
             <div className="text-xs text-gray-500">
               {estadisticasPorTipo.checkout.enProgreso} en progreso
             </div>
             <div className="mt-2 text-sm">
-              Promedio: {Math.round(estadisticasPorTipo.checkout.tiempoPromedio || 0)}min
+              Promedio:{" "}
+              {Math.round(estadisticasPorTipo.checkout.tiempoPromedio || 0)}min
             </div>
           </CardContent>
         </Card>
@@ -156,12 +161,15 @@ export function HousekeepingStats({
             <Clock className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{estadisticasPorTipo.occupied.total}</div>
+            <div className="text-2xl font-bold">
+              {estadisticasPorTipo.occupied.total}
+            </div>
             <div className="text-xs text-gray-500">
               {estadisticasPorTipo.occupied.enProgreso} en progreso
             </div>
             <div className="mt-2 text-sm">
-              Promedio: {Math.round(estadisticasPorTipo.occupied.tiempoPromedio || 0)}min
+              Promedio:{" "}
+              {Math.round(estadisticasPorTipo.occupied.tiempoPromedio || 0)}min
             </div>
           </CardContent>
         </Card>
@@ -172,12 +180,15 @@ export function HousekeepingStats({
             <Timer className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{estadisticasPorTipo.touch.total}</div>
+            <div className="text-2xl font-bold">
+              {estadisticasPorTipo.touch.total}
+            </div>
             <div className="text-xs text-gray-500">
               {estadisticasPorTipo.touch.enProgreso} en progreso
             </div>
             <div className="mt-2 text-sm">
-              Promedio: {Math.round(estadisticasPorTipo.touch.tiempoPromedio || 0)}min
+              Promedio:{" "}
+              {Math.round(estadisticasPorTipo.touch.tiempoPromedio || 0)}min
             </div>
           </CardContent>
         </Card>
