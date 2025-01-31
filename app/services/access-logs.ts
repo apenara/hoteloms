@@ -1,7 +1,7 @@
 // src/lib/services/access-logs.ts
 import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import type { AccessLog } from '@/lib/constants/permissions';
+import type { AccessLog } from '@/app/lib/constants/permissions';
 
 export async function logAccess({
   userId,
