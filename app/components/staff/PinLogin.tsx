@@ -1,171 +1,149 @@
-// src/components/PinLogin.tsx
-'use client';
-
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+// src/components/staff/PinLogin.tsx
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { useRouter } from 'next/navigation';
+import { hasPermission } from '@/app/lib/constants/permissions';
+import { logAccess } from '@/app/services/access-logs';
 
-export function PinLogin({ isOpen, onClose, onSuccess, hotelId }) {
+interface PinLoginProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (staffMember: any) => void;
+  hotelId: string;
+}
+
+export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps) {
   const [pin, setPin] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [error, setError] = useState('');
 
-  const handlePinInput = (number) => {
-    if (pin.length < 6) {
-      setPin(prevPin => prevPin + number);
-    }
+  const validatePin = (pin: string) => {
+    // Validar que el PIN tenga exactamente 10 dígitos y solo contenga números
+    return /^\d{10}$/.test(pin);
   };
 
-  const handleBackspace = () => {
-    setPin(prevPin => prevPin.slice(0, -1));
-  };
-
-  const handleClear = () => {
-    setPin('');
-  };
-
-  const verifyPin = async () => {
-    if (pin.length !== 6) return;
-
-    setLoading(true);
+  const handlePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
+    setLoading(true);
 
     try {
-      console.log('Verificando PIN para el hotel:', hotelId);
-      
-      const staffRef = collection(db, 'hotels', hotelId, 'staff');
-      const q = query(staffRef, where('pin', '==', pin), where('status', '==', 'active'));
-      const snapshot = await getDocs(q);
-
-      if (snapshot.empty) {
-        setError('PIN inválido o usuario inactivo');
-        return;
+      // Validar formato del PIN
+      if (!validatePin(pin)) {
+        throw new Error('El PIN debe contener exactamente 10 dígitos numéricos');
       }
 
-      const staffData = snapshot.docs[0].data();
-      const timestamp = new Date().toISOString();
+      // Buscar el staff por PIN
+      const staffRef = collection(db, 'hotels', hotelId, 'staff');
+      const q = query(staffRef, where('pin', '==', pin));
+      const querySnapshot = await getDocs(q);
 
-      const staffMember = {
-        id: snapshot.docs[0].id,
-        name: staffData.name,
-        email: staffData.email || '',
+      if (querySnapshot.empty) {
+        throw new Error('PIN inválido o usuario inactivo');
+      }
+
+      const staffDoc = querySnapshot.docs[0];
+      const staffData = staffDoc.data();
+
+      // Verificar si el staff está activo
+      if (staffData.status !== 'active') {
+        throw new Error('Usuario inactivo. Contacte al administrador');
+      }
+
+      // Verificar permisos básicos
+      if (!hasPermission(staffData.role, 'canChangeRoomStatus')) {
+        throw new Error('No tienes los permisos necesarios para acceder');
+      }
+
+      // Registrar acceso
+      await logAccess({
+        userId: staffDoc.id,
+        userName: staffData.name,
         role: staffData.role,
-        hotelId: hotelId,
-        status: 'active',
         accessType: 'pin',
-        timestamp,
-        lastLogin: timestamp,
-        // Incluir cualquier otro dato necesario del staff
-        shift: staffData.shift,
-        assignedAreas: staffData.assignedAreas || []
-      };
+        hotelId: hotelId,
+        action: 'pin_login'
+      });
 
-      console.log('Staff member encontrado:', staffMember);
+      // Actualizar último acceso
+      await updateDoc(doc(db, 'hotels', hotelId, 'staff', staffDoc.id), {
+        lastLogin: new Date(),
+        lastLoginType: 'pin'
+      });
 
-      // Guardar en localStorage
-      localStorage.setItem('staffAccess', JSON.stringify(staffMember));
-      console.log('Sesión guardada en localStorage');
-
-      // Pequeña pausa para asegurar que los datos se guarden
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      onSuccess(staffMember);
+      // Notificar éxito
+      onSuccess({
+        id: staffDoc.id,
+        ...staffData,
+        lastAccess: new Date().toISOString()
+      });
+      
       onClose();
+      setPin('');
 
-      // Forzar una recarga completa para asegurar que el AuthProvider detecte la sesión
-      window.location.reload();
     } catch (error) {
-      console.error('Error al verificar PIN:', error);
-      setError('Error al verificar PIN');
+      console.error('Error de autenticación:', error);
+      setError(error.message || 'Error en la autenticación');
     } finally {
       setLoading(false);
     }
   };
 
-  const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'back'];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[350px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Ingrese su PIN</DialogTitle>
+          <DialogTitle>Acceso del Personal</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* PIN Display */}
-          <div className="flex justify-center space-x-3">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className={`w-10 h-10 border-2 rounded-lg flex items-center justify-center text-2xl font-bold ${
-                  pin[i] ? 'border-blue-500' : 'border-gray-300'
-                }`}
-              >
-                {pin[i] ? '•' : ''}
-              </div>
-            ))}
-          </div>
-
+        <form onSubmit={handlePinSubmit} className="space-y-4">
           {error && (
-            <div className="text-red-500 text-center text-sm">
-              {error}
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          {/* Number Pad */}
-          <div className="grid grid-cols-3 gap-3">
-            {numbers.map((num, index) => {
-              if (num === null) return <div key={index} />;
-              
-              if (num === 'back') {
-                return (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    onClick={handleBackspace}
-                    className="h-14"
-                  >
-                    ←
-                  </Button>
-                );
-              }
-
-              return (
-                <Button
-                  key={index}
-                  variant="outline"
-                  onClick={() => handlePinInput(num)}
-                  className="h-14 text-xl"
-                  disabled={pin.length >= 6}
-                >
-                  {num}
-                </Button>
-              );
-            })}
+          <div className="space-y-2">
+            <Label htmlFor="pin">PIN de Acceso</Label>
+            <Input
+              id="pin"
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="Ingrese su PIN de 10 dígitos"
+              maxLength={10}
+              pattern="\d*"
+              inputMode="numeric"
+              required
+              className="text-center tracking-widest text-lg"
+            />
+            <p className="text-sm text-gray-500">
+              Ingrese su número de documento como PIN
+            </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex space-x-2">
+          <div className="flex justify-end space-x-2">
             <Button
+              type="button"
               variant="outline"
-              className="flex-1"
-              onClick={handleClear}
+              onClick={onClose}
+              disabled={loading}
             >
-              Limpiar
+              Cancelar
             </Button>
             <Button
-              className="flex-1"
-              onClick={verifyPin}
-              disabled={pin.length !== 6 || loading}
+              type="submit"
+              disabled={loading || pin.length !== 10}
             >
-              {loading ? 'Verificando...' : 'Entrar'}
+              {loading ? 'Verificando...' : 'Ingresar'}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

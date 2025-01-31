@@ -17,6 +17,8 @@ import { auth } from '@/lib/firebase/config';
 import { Label } from '@/components/ui/label';
 import { PinLogin } from '@/components/staff/PinLogin';
 import StaffLoginDialog from '@/components/staff/StaffLoginDialog';
+import { logAccess } from '@/app/services/access-logs';
+import { hasPermission } from '@/app/lib/constants/permissions';
 
 
 export default function PublicRoomView() {
@@ -66,36 +68,77 @@ export default function PublicRoomView() {
     fetchRoomData();
   }, [params]);
 
-  const handleStaffAccess = (staffMember) => {
-    // Guardar información detallada del staff member
-    const staffAccess = {
-      id: staffMember.id,            // ID del documento staff
-      userId: staffMember.userId,    // ID de Firebase Auth si existe
-      name: staffMember.name,
-      role: staffMember.role,
-      hotelId: params.hotelId,
-      type: 'staff',
-      accessType: 'pin',             // Indicar que el acceso fue por PIN
-      timestamp: new Date().toISOString()
-    };
-    
-    localStorage.setItem('staffAccess', JSON.stringify(staffAccess));
-    
-    // También guardamos en sessionStorage para mantener la sesión temporal
-    sessionStorage.setItem('currentStaffSession', JSON.stringify({
-      ...staffAccess,
-      sessionStart: new Date().toISOString()
-    }));
-    
-    // router.push(`/rooms/${params.hotelId}/${params.roomId}/staff`);
-    window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
-
+  const handleStaffAccess = async (staffMember) => {
+    try {
+      // Verificar permisos básicos
+      if (!hasPermission(staffMember.role, 'canChangeRoomStatus')) {
+        throw new Error('No tienes permisos para acceder a esta sección');
+      }
+      
+      // Crear el objeto de acceso
+      const staffAccess = {
+        id: staffMember.id,
+        userId: staffMember.userId,
+        name: staffMember.name,
+        role: staffMember.role,
+        hotelId: params.hotelId,
+        type: 'staff',
+        accessType: 'pin',
+        timestamp: new Date().toISOString()
+      };
+      
+      // Guardar en localStorage
+      localStorage.setItem('staffAccess', JSON.stringify(staffAccess));
+      
+      // Guardar en sessionStorage
+      sessionStorage.setItem('currentStaffSession', JSON.stringify({
+        ...staffAccess,
+        sessionStart: new Date().toISOString()
+      }));
+      
+      // Registrar el acceso
+      await logAccess({
+        userId: staffMember.id,
+        userName: staffMember.name,
+        role: staffMember.role,
+        accessType: 'pin',
+        hotelId: params.hotelId,
+        roomId: params.roomId,
+        action: 'room_access'
+      });
+      
+      // Redireccionar
+      window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
+    } catch (error) {
+      console.error('Error en acceso de staff:', error);
+      setError(error.message);
+    }
   };
 
-  const handleLoginSuccess = (user) => {
-    // router.push(`/rooms/${params.hotelId}/${params.roomId}/staff`);
-    window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
-
+  const handleLoginSuccess = async (user) => {
+    try {
+      // Verificar permisos para usuarios administrativos
+      if (!hasPermission(user.role, 'canAccessOperationalPages')) {
+        throw new Error('No tienes permisos para acceder a esta sección');
+      }
+      
+      // Registrar el acceso
+      await logAccess({
+        userId: user.id,
+        userName: user.name,
+        role: user.role,
+        accessType: 'email',
+        hotelId: params.hotelId,
+        roomId: params.roomId,
+        action: 'room_access'
+      });
+      
+      // Redireccionar
+      window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
+    } catch (error) {
+      console.error('Error en login:', error);
+      setError(error.message);
+    }
   };
 
   const handleStatusChange = async (newStatus) => {
@@ -110,24 +153,34 @@ export default function PublicRoomView() {
         lastStatusChange: timestamp
       });
 
-      // Registrar en el historial
+      // Registrar en el historial con más detalles
       const historyRef = collection(db, 'hotels', params.hotelId, 'rooms', params.roomId, 'history');
       await addDoc(historyRef, {
         previousStatus: room?.status || 'unknown',
         newStatus,
         timestamp,
         source: 'guest',
-        notes: `Solicitud de huésped: ${newStatus}`
+        notes: `Solicitud de huésped: ${newStatus}`,
+        room: {
+          number: room?.number,
+          id: room?.id
+        }
       });
 
-      // Crear una solicitud
+      // Crear una solicitud más detallada
       const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
       await addDoc(requestsRef, {
         roomId: params.roomId,
         roomNumber: room?.number,
         type: newStatus,
         status: 'pending',
-        createdAt: timestamp
+        createdAt: timestamp,
+        source: 'guest',
+        priority: newStatus === 'need_cleaning' ? 'high' : 'medium',
+        details: {
+          previousStatus: room?.status,
+          requestType: 'guest_initiated'
+        }
       });
 
       setSuccessMessage('Solicitud enviada correctamente');
@@ -138,7 +191,6 @@ export default function PublicRoomView() {
       setError('Error al procesar la solicitud');
     }
   };
-
   const handleMessageSubmit = async () => {
     if (!message.trim() || !params?.hotelId || !params?.roomId) return;
 

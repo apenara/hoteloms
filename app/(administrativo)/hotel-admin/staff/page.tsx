@@ -3,9 +3,9 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import { deleteStaffMember } from "@/lib/firebase/user-management";
+import { deleteStaffMember, suspendStaffMember } from "@/lib/firebase/user-management";
 import { db } from "@/lib/firebase/config";
-import { collection, query, getDocs } from "firebase/firestore";
+import { collection, query, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { AddStaffDialog } from "@/components/staff/AddStaffDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ export default function StaffPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [staffToDelete, setStaffToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -72,33 +73,39 @@ export default function StaffPage() {
     fetchStaff();
   }, [user, refreshTrigger]);
 
-  const handleDelete = async () => {
-    if (!selectedStaff || !user?.hotelId) return;
+  const handleDeleteConfirm = (staffId: string) => {
+    setStaffToDelete(staffId);
+    setShowDeleteConfirm(true);
+  };
+  const handleDeleteStaff = async () => {
+    if (!staffToDelete || !user?.hotelId) return;
 
-    setDeleteLoading(true);
     try {
-      await deleteStaffMember(
-        selectedStaff.id,
-        user.hotelId,
-        selectedStaff.userId
-      );
+      setLoading(true);
 
-      setRefreshTrigger((prev) => prev + 1);
+      // 1. Eliminar el documento del staff en Firestore
+      const staffRef = doc(db, 'hotels', user.hotelId, 'staff', staffToDelete);
+      await deleteDoc(staffRef);
+
+      // 2. Actualizar la lista de staff
+      setStaffMembers((prev) => prev.filter((staff) => staff.id !== staffToDelete));
+
+      // 3. Mostrar un mensaje de éxito
       toast({
-        title: "Éxito",
-        description: "Personal eliminado correctamente",
+        title: 'Éxito',
+        description: 'Personal eliminado correctamente',
       });
     } catch (error) {
-      console.error("Error:", error);
+      console.error('Error eliminando el personal:', error);
       toast({
-        title: "Error",
-        description: "Error al eliminar el personal",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudo eliminar el personal',
+        variant: 'destructive',
       });
     } finally {
-      setDeleteLoading(false);
+      setLoading(false);
       setShowDeleteConfirm(false);
-      setSelectedStaff(null);
+      setStaffToDelete(null);
     }
   };
 
@@ -184,11 +191,7 @@ export default function StaffPage() {
                   </TableCell>
                   <TableCell>{staff.email || "N/A"}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        staff.status === "active" ? "default" : "secondary"
-                      }
-                    >
+                    <Badge variant={staff.status === "active" ? "default" : "secondary"}>
                       {staff.status}
                     </Badge>
                   </TableCell>
@@ -206,15 +209,11 @@ export default function StaffPage() {
                         PIN
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="destructive"
                         size="sm"
-                        className="text-yellow-600 hover:text-yellow-700"
-                        onClick={() => {
-                          setSelectedStaff(staff);
-                          setShowDeleteConfirm(true);
-                        }}
+                        onClick={() => handleDeleteConfirm(staff.id)}
                       >
-                        <Ban className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -268,6 +267,21 @@ export default function StaffPage() {
             >
               {deleteLoading ? "Suspendiendo..." : "Suspender"}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará al miembro del personal. ¿Desea continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteStaff}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -80,56 +80,65 @@ export async function createStaffMember({
   email,
   role,
   hotelId,
-  assignedAreas = []
+  assignedAreas = [],
+  pin, // Nuevo parámetro para el PIN
 }: {
   name: string;
-  email: string;
+  email?: string; // Hacer el email opcional
   role: StaffRole;
   hotelId: string;
   assignedAreas?: string[];
+  pin?: string; // Nuevo parámetro para el PIN
 }) {
   try {
-    // 1. Crear usuario en Firebase Auth
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      generateTemporaryPassword()
-    );
-    const uid = userCredential.user.uid;
+    let uid: string | null = null;
 
-    // 2. Crear documento en la colección users
-    await setDoc(doc(db, 'users', uid), {
-      email,
-      name,
-      role,
-      hotelId,
-      status: 'pending_activation',
-      createdAt: new Date(),
-      lastLogin: null,
-      authMethod: 'email',
-      mustChangePassword: true
-    });
+    // 1. Si se proporciona un correo electrónico, crear usuario en Firebase Auth
+    if (email) {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        generateTemporaryPassword()
+      );
+      uid = userCredential.user.uid;
 
-    // 3. Crear documento en la colección staff usando el mismo UID
-    await setDoc(doc(db, 'hotels', hotelId, 'staff', uid), {
+      // 2. Crear documento en la colección users
+      await setDoc(doc(db, 'users', uid), {
+        email,
+        name,
+        role,
+        hotelId,
+        status: 'pending_activation',
+        createdAt: new Date(),
+        lastLogin: null,
+        authMethod: 'email',
+        mustChangePassword: true,
+      });
+
+      // 3. Enviar email para cambio de contraseña
+      await sendPasswordResetEmail(auth, email);
+    }
+
+    // 4. Crear documento en la colección staff
+    const staffRef = doc(collection(db, 'hotels', hotelId, 'staff'));
+    await setDoc(staffRef, {
       name,
-      email,
+      email: email || null, // Guardar el correo si existe
       role,
       assignedAreas,
-      status: 'pending_activation',
+      pin: pin || null, // Guardar el PIN si se proporciona
+      status: 'active',
       createdAt: new Date(),
       lastLogin: null,
-      authMethod: 'email',
-      userId: uid // Referencia al mismo ID
+      authMethod: email ? 'email' : 'pin', // Indicar el método de autenticación
+      userId: uid || null, // Referencia al ID de Firebase Auth si existe
     });
-
-    // 4. Enviar email para cambio de contraseña
-    await sendPasswordResetEmail(auth, email);
 
     return {
       success: true,
-      userId: uid,
-      staffId: uid // Ahora son el mismo ID
+      userId: uid, // Puede ser null si no se creó un usuario en Firebase Auth
+      staffId: staffRef.id, // ID del documento en la colección staff
+      pin, // Devolver el PIN asignado
     };
   } catch (error) {
     console.error('Error creating staff member:', error);

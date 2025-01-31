@@ -8,8 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
+import { hasPermission } from '@/app/lib/constants/permissions';
+import { logAccess } from '@/app/services/access-logs';
+import { User, UserRole } from '@/lib/types';
 
 interface StaffLoginDialogProps {
   isOpen: boolean;
@@ -47,7 +50,7 @@ const StaffLoginDialog: React.FC<StaffLoginDialogProps> = ({
     setLoginError('');
 
     try {
-      // 1. Primero hacemos el login en Firebase Auth
+      // 1. Autenticar con Firebase Auth
       const userCredential = await signInWithEmailAndPassword(
         auth,
         loginData.email,
@@ -58,7 +61,7 @@ const StaffLoginDialog: React.FC<StaffLoginDialogProps> = ({
         throw new Error('No se pudo obtener la información del usuario');
       }
       
-      // 2. Buscamos el staff member en la colección del hotel
+      // 2. Buscar el staff member en la colección del hotel
       const staffRef = collection(db, 'hotels', hotelId, 'staff');
       const staffQuery = query(staffRef, where('userId', '==', userCredential.user.uid));
       const staffSnapshot = await getDocs(staffQuery);
@@ -67,33 +70,52 @@ const StaffLoginDialog: React.FC<StaffLoginDialogProps> = ({
         throw new Error('Usuario no encontrado como personal de este hotel');
       }
 
-      // Obtener los datos del primer documento (debería ser único)
-      const staffData = staffSnapshot.docs[0].data();
+      const staffDoc = staffSnapshot.docs[0];
+      const staffData = staffDoc.data();
 
-      // Verificar el estado del usuario
+      // 3. Verificar el estado del usuario
       if (staffData.status !== 'active') {
         throw new Error('Usuario inactivo. Contacte al administrador');
       }
 
-      // Si todo está bien, llamar a onSuccess con los datos del staff member
-      onSuccess({
-        id: staffSnapshot.docs[0].id,
+      // 4. Verificar permisos
+      if (!hasPermission(staffData.role, 'canAccessOperationalPages')) {
+        throw new Error('No tienes los permisos necesarios para acceder');
+      }
+
+      // 5. Registrar el acceso
+      await logAccess({
+        userId: staffDoc.id,
+        userName: staffData.name,
+        role: staffData.role,
+        accessType: 'email',
+        hotelId,
+        action: 'email_login'
+      });
+
+      // 6. Actualizar último acceso
+      await updateDoc(doc(staffRef, staffDoc.id), {
+        lastLogin: new Date(),
+        lastLoginType: 'email'
+      });
+
+      // 7. Preparar datos del usuario y llamar a onSuccess
+      const userData = {
+        id: staffDoc.id,
         authId: userCredential.user.uid,
         email: staffData.email,
         name: staffData.name,
         role: staffData.role,
-        phone: staffData.phone,
         status: staffData.status,
-        // Incluir cualquier otro dato necesario
-      });
+        lastAccess: new Date().toISOString()
+      };
 
-      // Cerrar el diálogo
+      onSuccess(userData);
       onClose();
       
     } catch (error: any) {
       console.error('Error en login:', error);
       
-      // Manejar diferentes tipos de errores
       let errorMessage = 'Error al iniciar sesión';
       
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
@@ -112,19 +134,21 @@ const StaffLoginDialog: React.FC<StaffLoginDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Acceso del Personal</DialogTitle>
           <DialogDescription>
             Ingresa con tus credenciales de personal del hotel
           </DialogDescription>
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {loginError && (
             <Alert variant="destructive">
               <AlertDescription>{loginError}</AlertDescription>
             </Alert>
           )}
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -135,8 +159,10 @@ const StaffLoginDialog: React.FC<StaffLoginDialogProps> = ({
               onChange={handleInputChange}
               placeholder="tu@email.com"
               required
+              disabled={isLoggingIn}
             />
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="password">Contraseña</Label>
             <Input
@@ -147,19 +173,22 @@ const StaffLoginDialog: React.FC<StaffLoginDialogProps> = ({
               onChange={handleInputChange}
               placeholder="••••••••"
               required
+              disabled={isLoggingIn}
             />
           </div>
+
           <div className="flex justify-end space-x-2">
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose}
+              disabled={isLoggingIn}
             >
               Cancelar
             </Button>
             <Button 
               type="submit" 
-              disabled={isLoggingIn}
+              disabled={isLoggingIn || !loginData.email || !loginData.password}
             >
               {isLoggingIn ? 'Ingresando...' : 'Ingresar'}
             </Button>

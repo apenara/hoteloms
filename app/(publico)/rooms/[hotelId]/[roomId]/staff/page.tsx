@@ -26,7 +26,8 @@ import { registrarCambioEstado } from '@/app/services/housekeeping';
 
 export default function StaffRoomView() {
   const params = useParams();
-  const { user } = useAuth();
+  const { user, staff, checkAccess } = useAuth(); // Obtener staff y checkAccess
+  const currentUser = user || staff; // Usar cualquiera que esté disponible
   const [mounted, setMounted] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [hotel, setHotel] = useState(null);
@@ -114,7 +115,7 @@ export default function StaffRoomView() {
 
 
   const handleStateChange = async (newState: string) => {
-    if (!user || !params?.hotelId || !params?.roomId || !room) {
+    if (!currentUser || !params?.hotelId || !params?.roomId || !room) {
       setErrorMessage('Error: Faltan datos necesarios');
       setShowErrorDialog(true);
       return;
@@ -129,11 +130,11 @@ export default function StaffRoomView() {
     try {
       setProcesando(true);
   
-      // Registrar el cambio de estado
+      // Registrar el cambio de estado usando el ID correcto
       await registrarCambioEstado(
         params.hotelId,
         params.roomId,
-        user.uid,
+        currentUser.id, // Usar id en lugar de uid
         newState,
         notes.trim() || undefined
       );
@@ -149,12 +150,11 @@ export default function StaffRoomView() {
           description: notes.trim(),
           createdAt: new Date(),
           createdBy: {
-            id: user.uid,
-            name: user.name,
-            role: user.role
+            id: currentUser.id,
+            name: currentUser.name,
+            role: currentUser.role
           },
-          priority: 'medium', // Puedes ajustar la prioridad según necesites
-          // Campos adicionales que puedas necesitar
+          priority: 'medium',
           location: `Habitación ${room.number}`,
           category: 'maintenance',
           source: 'staff'
@@ -184,37 +184,46 @@ export default function StaffRoomView() {
   };
 
   const getAvailableStates = () => {
-    if (!user || !room) return [];
+    if (!currentUser || !room) return [];
     let states = [];
   
-    if (user.role === 'housekeeper' || user.role === 'hotel_admin') {
-      switch (room.status) {
-        case 'available':
-        case 'occupied':
-        case 'clean_occupied': 
-          states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
-          break;
-        case 'cleaning_occupied':
-          states = ['clean_occupied'];
-          break;
-        case 'cleaning_checkout':
-        case 'cleaning_touch':
-          states = ['inspection'];
-          break;
-        case 'inspection':
+    // Verificar permisos usando checkAccess
+    if (checkAccess('canChangeRoomStatus')) {
+      if (currentUser.role === 'housekeeper' || currentUser.role === 'hotel_admin') {
+        switch (room.status) {
+          case 'available':
+          case 'occupied':
+          case 'clean_occupied': 
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
+            break;
+          case 'cleaning_occupied':
+            states = ['clean_occupied'];
+            break;
+          case 'cleaning_checkout':
+          case 'cleaning_touch':
+            states = ['inspection'];
+            break;
+          case 'inspection':
+            states = ['available'];
+            break;
+          case 'need_cleaning':
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
+            break;
+          default:
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
+        }
+      }
+  
+      if (currentUser.role === 'maintenance') {
+        if (room.status === 'maintenance') {
           states = ['available'];
-          break;
-        case 'need_cleaning':
-          states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
-          break;
-        default:
-          states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
+        }
       }
     }
   
-    if (!states.includes('maintenance')) {
-      states.push('maintenance');
-    }
+    // Mantenimiento siempre disponible para todo el personal
+    states.push('maintenance');
+    
     return states;
   };
 
@@ -244,7 +253,7 @@ export default function StaffRoomView() {
             {hotel?.hotelName} - Habitación {room?.number}
           </CardTitle>
           <div className="text-sm text-gray-500">
-            Personal: {user?.name} ({user?.role})
+            Personal: {currentUser?.name} ({currentUser?.role})
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

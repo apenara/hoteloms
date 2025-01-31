@@ -1,18 +1,12 @@
 // src/components/staff/AddStaffDialog.tsx
 'use client';
-
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { createStaffMember } from '@/lib/firebase/user-management';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { StaffRole } from '@/lib/types';
 
 interface AddStaffDialogProps {
@@ -25,36 +19,54 @@ export function AddStaffDialog({ isOpen, onClose, onSuccess }: AddStaffDialogPro
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [generatedPin, setGeneratedPin] = useState<string | null>(null); // Estado para el PIN asignado
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     role: '',
-    assignedAreas: []
+    pin: '', // Nuevo campo para el PIN
+    assignedAreas: [],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-
+    setGeneratedPin(null);
+  
     try {
+      // Validar que se proporcione un correo o un PIN
+      if (!formData.email && !formData.pin) {
+        throw new Error('Debe proporcionar un correo electrónico o un PIN');
+      }
+  
+      // Validar el PIN si se proporciona
+      if (formData.pin && formData.pin.length !== 10) {
+        throw new Error('El PIN debe tener exactamente 10 caracteres');
+      }
+  
       const result = await createStaffMember({
         ...formData,
         hotelId: user.hotelId,
-        role: formData.role as StaffRole
+        role: formData.role as StaffRole,
+        pin: formData.pin || undefined, // Pasar el PIN si existe
       });
-
+  
+      if (result.pin) {
+        setGeneratedPin(result.pin); // Mostrar el PIN asignado
+      }
+  
       onSuccess();
-      // Resetear formulario
       setFormData({
         name: '',
         email: '',
         role: '',
-        assignedAreas: []
+        pin: '',
+        assignedAreas: [],
       });
     } catch (error) {
       console.error('Error:', error);
-      setError('Error al crear el personal');
+      setError(error.message || 'Error al crear el personal');
     } finally {
       setLoading(false);
     }
@@ -73,7 +85,15 @@ export function AddStaffDialog({ isOpen, onClose, onSuccess }: AddStaffDialogPro
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
+          {generatedPin && (
+            <Alert>
+              <AlertDescription>
+                Personal creado exitosamente. PIN asignado: <strong>{generatedPin}</strong>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-medium">Nombre</label>
             <Input
@@ -109,7 +129,15 @@ export function AddStaffDialog({ isOpen, onClose, onSuccess }: AddStaffDialogPro
             </select>
           </div>
 
-
+          <div className="space-y-2">
+            <label className="text-sm font-medium">PIN (10 caracteres)</label>
+            <Input
+              value={formData.pin}
+              onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+              placeholder="Asignar un PIN de 10 caracteres"
+              maxLength={10}
+            />
+          </div>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>

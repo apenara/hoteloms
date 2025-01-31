@@ -1,20 +1,11 @@
-// src/components/staff/PinManagement.tsx
-'use client';
-
+"use client";
 import { useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import { useAuth } from '@/lib/auth';
-import { generatePin } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Copy, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { updateDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 interface PinManagementProps {
   staff: any;
@@ -23,49 +14,39 @@ interface PinManagementProps {
 }
 
 export function PinManagement({ staff, isOpen, onClose }: PinManagementProps) {
-  const { user } = useAuth();
+  const [pin, setPin] = useState(staff?.pin || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [pin, setPin] = useState(staff?.pin || '');
 
-  const handleRegeneratePin = async () => {
-    if (!user?.hotelId || !staff?.id) return;
+  const handleUpdatePin = async () => {
+    if (!staff || !staff.id || !staff.hotelId) return;
 
     try {
-      setLoading(true);
-      const newPin = generatePin(6);
-      const staffRef = doc(db, 'hotels', user.hotelId, 'staff', staff.id);
-      
-      await updateDoc(staffRef, {
-        pin: newPin,
-        lastPinUpdate: new Date()
-      });
+      if (pin.length !== 10) {
+        throw new Error('El PIN debe tener exactamente 10 caracteres');
+      }
 
-      setPin(newPin);
-      setSuccess('PIN actualizado correctamente');
-      
-      setTimeout(() => setSuccess(''), 3000);
+      setLoading(true);
+      setError('');
+
+      // Actualizar el PIN en Firestore
+      const staffRef = doc(db, 'hotels', staff.hotelId, 'staff', staff.id);
+      await updateDoc(staffRef, { pin });
+
+      onClose();
     } catch (error) {
-      console.error('Error regenerating PIN:', error);
-      setError('Error al regenerar el PIN');
+      console.error('Error al actualizar el PIN:', error);
+      setError(error.message || 'Error al actualizar el PIN');
     } finally {
       setLoading(false);
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(pin).then(() => {
-      setSuccess('PIN copiado al portapapeles');
-      setTimeout(() => setSuccess(''), 3000);
-    });
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Gestión de PIN - {staff?.name}</DialogTitle>
+          <DialogTitle>Gestionar PIN</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -74,45 +55,23 @@ export function PinManagement({ staff, isOpen, onClose }: PinManagementProps) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          {success && (
-            <Alert className="bg-green-100">
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">PIN Actual</label>
-            <div className="flex items-center space-x-2">
-              <div className="flex-1 p-2 border rounded bg-gray-50">
-                <code className="text-lg">{pin}</code>
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={copyToClipboard}
-                title="Copiar PIN"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRegeneratePin}
-                disabled={loading}
-                title="Regenerar PIN"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
+            <label className="text-sm font-medium">PIN (10 caracteres)</label>
+            <Input
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="Asignar un PIN de 10 caracteres"
+              maxLength={10}
+            />
           </div>
 
-          <div className="text-sm text-gray-500">
-            <p>Último cambio: {staff?.lastPinUpdate ? new Date(staff.lastPinUpdate.seconds * 1000).toLocaleString() : 'No registrado'}</p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={onClose}>
-              Cerrar
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdatePin} disabled={loading}>
+              {loading ? 'Guardando...' : 'Guardar'}
             </Button>
           </div>
         </div>
