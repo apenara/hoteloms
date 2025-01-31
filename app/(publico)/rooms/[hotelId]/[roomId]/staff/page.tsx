@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -20,7 +20,7 @@ import {
 import { RequestCard } from '@/components/hotels/RequestCard';
 import MaintenancePreview from '@/components/maintenance/MaintenancePreview';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { Room } from '@/lib/types';
+import type { Room } from '@/app/lib/types';
 import { ROOM_STATES } from '@/app/lib/constants/room-states';
 import { registrarCambioEstado } from '@/app/services/housekeeping';
 
@@ -112,22 +112,24 @@ export default function StaffRoomView() {
     fetchData();
   }, [params?.hotelId, params?.roomId]);
 
+
   const handleStateChange = async (newState: string) => {
     if (!user || !params?.hotelId || !params?.roomId || !room) {
       setErrorMessage('Error: Faltan datos necesarios');
       setShowErrorDialog(true);
       return;
     }
-
+  
     if (newState === 'maintenance' && !notes.trim()) {
       setErrorMessage('Por favor, añade una nota describiendo el problema de mantenimiento');
       setShowErrorDialog(true);
       return;
     }
-
+  
     try {
       setProcesando(true);
-
+  
+      // Registrar el cambio de estado
       await registrarCambioEstado(
         params.hotelId,
         params.roomId,
@@ -135,17 +137,40 @@ export default function StaffRoomView() {
         newState,
         notes.trim() || undefined
       );
-
+  
+      // Si el estado es mantenimiento, crear una solicitud
+      if (newState === 'maintenance') {
+        const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
+        await addDoc(requestsRef, {
+          type: 'maintenance',
+          status: 'pending',
+          roomId: params.roomId,
+          roomNumber: room.number,
+          description: notes.trim(),
+          createdAt: new Date(),
+          createdBy: {
+            id: user.uid,
+            name: user.name,
+            role: user.role
+          },
+          priority: 'medium', // Puedes ajustar la prioridad según necesites
+          // Campos adicionales que puedas necesitar
+          location: `Habitación ${room.number}`,
+          category: 'maintenance',
+          source: 'staff'
+        });
+      }
+  
       setSuccessMessage('Estado actualizado correctamente');
       setNotes('');
       setRoom(prev => prev ? { ...prev, status: newState } : null);
-
+  
       // Recargar datos actualizados
       await Promise.all([
         fetchPendingRequests(),
         fetchHistoryEntries()
       ]);
-
+  
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
