@@ -1,5 +1,5 @@
 // src/lib/constants/permissions.ts
-import type { UserRole, StaffRole } from '@/lib/types'
+import type { UserRole, StaffRole } from '@/app/lib/types';
 
 export const ROLE_PERMISSIONS = {
   super_admin: {
@@ -29,6 +29,17 @@ export const ROLE_PERMISSIONS = {
 } as const;
 
 export const STAFF_PERMISSIONS = {
+  reception: {
+    canChangeRoomStatus: true,
+    canViewAllRooms: true,
+    allowedStatuses: ['available', 'occupied', 'checkout', 'in_house'],
+    canViewCleaningProgress: true,
+    canCreateRequests: true,
+    canViewNotifications: true,
+    canUpdateOccupancyInfo: true,
+    priorityLevels: ['normal', 'high'],
+    canAccessDashboard: true
+  },
   housekeeper: {
     canChangeRoomStatus: true,
     allowedStatuses: ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch', 'need_cleaning'],
@@ -45,6 +56,23 @@ export const STAFF_PERMISSIONS = {
     canApproveCleanings: true,
     canCreateRequests: true,
     canAssignTasks: true
+  }
+} as const;
+
+// Tipos de acciones permitidas por rol
+export const ROLE_ACTIONS = {
+  reception: {
+    roomStatusChanges: {
+      'available': ['occupied', 'maintenance'],
+      'occupied': ['checkout'],
+      'checkout': ['need_cleaning'],
+      'in_house': ['occupied'],
+      'need_cleaning': [] // Solo lectura
+    },
+    notifications: {
+      canView: ['room_ready', 'cleaning_completed', 'maintenance_completed', 'cleaning_delayed'],
+      canCreate: ['priority_cleaning']
+    }
   }
 } as const;
 
@@ -65,14 +93,68 @@ export function getAllowedStatuses(role: StaffRole): string[] {
   return STAFF_PERMISSIONS[role]?.allowedStatuses || []
 }
 
+export function canChangeStatus(
+  role: StaffRole,
+  currentStatus: string,
+  newStatus: string
+): boolean {
+  if (role === 'reception') {
+    const allowedChanges = ROLE_ACTIONS.reception.roomStatusChanges[currentStatus];
+    return allowedChanges?.includes(newStatus) || false;
+  }
+  return STAFF_PERMISSIONS[role]?.allowedStatuses?.includes(newStatus) || false;
+}
+
+export function canViewStatus(role: StaffRole, status: string): boolean {
+  if (role === 'reception' && STAFF_PERMISSIONS.reception.canViewAllRooms) {
+    return true;
+  }
+  return STAFF_PERMISSIONS[role]?.allowedStatuses?.includes(status) || false;
+}
+
+export function getPriorityLevels(role: StaffRole): string[] {
+  return STAFF_PERMISSIONS[role]?.priorityLevels || ['normal'];
+}
+
 // Tipos de registro de acceso
 export interface AccessLog {
-  userId: string
-  userName: string
-  role: UserRole | StaffRole
-  accessType: 'pin' | 'email'
-  timestamp: Date
-  hotelId: string
-  roomId?: string
-  action?: string
+  userId: string;
+  userName: string;
+  role: UserRole | StaffRole;
+  accessType: 'pin' | 'email';
+  timestamp: Date;
+  hotelId: string;
+  roomId?: string;
+  action?: string;
+}
+
+// Verificar si un usuario puede realizar una acción específica en una habitación
+export function canPerformRoomAction(
+  role: StaffRole,
+  action: string,
+  currentStatus?: string,
+  newStatus?: string
+): boolean {
+  const permissions = STAFF_PERMISSIONS[role];
+  
+  if (!permissions) return false;
+
+  switch (action) {
+    case 'change_status':
+      if (!currentStatus || !newStatus) return false;
+      return canChangeStatus(role, currentStatus, newStatus);
+      
+    case 'view_cleaning_progress':
+      return !!permissions.canViewCleaningProgress;
+      
+    case 'update_occupancy':
+      return !!permissions.canUpdateOccupancyInfo;
+      
+    case 'set_priority':
+      return Array.isArray(permissions.priorityLevels) && 
+             permissions.priorityLevels.length > 0;
+      
+    default:
+      return false;
+  }
 }

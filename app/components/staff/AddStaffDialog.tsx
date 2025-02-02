@@ -126,6 +126,7 @@ export function AddStaffDialog({ isOpen, onClose, onSuccess }: AddStaffDialogPro
               <option value="housekeeper">Limpieza</option>
               <option value="maintenance">Mantenimiento</option>
               <option value="manager">Supervisor</option>
+              <option value="reception">Front</option>
             </select>
           </div>
 

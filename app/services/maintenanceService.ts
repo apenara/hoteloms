@@ -20,14 +20,17 @@ import {
     roomId: string;
     room: Room;
     notes: string;
-    user: any;
+    user: {
+      uid: string;
+      name: string;
+      role: string;
+    };
     previousState: {
       status: string;
       wasInCleaning: boolean;
       cleaningStaffId: string | null;
     };
   }
-  
   export async function createMaintenanceRequest({
     hotelId,
     roomId,
@@ -37,16 +40,19 @@ import {
     previousState
   }: CreateMaintenanceParams) {
     const timestamp = Timestamp.now();
+    
+
   
     try {
-      // Crear registro de mantenimiento
+      // 1. Crear registro de mantenimiento con todos los campos necesarios
       const maintenanceRef = collection(db, 'hotels', hotelId, 'maintenance');
       const maintenanceDoc = await addDoc(maintenanceRef, {
         roomId,
         roomNumber: room.number,
-        type: 'corrective',
+        type: 'corrective', // Tipo por defecto
+        category: 'room', // Ya que viene de una habitación
         status: 'pending',
-        priority: 'medium',
+        priority: 'medium', // Prioridad por defecto
         location: `Habitación ${room.number}`,
         description: notes,
         createdAt: timestamp,
@@ -56,10 +62,13 @@ import {
           name: user.name,
           role: user.role
         },
-        previousState
+        scheduledFor: timestamp, // Fecha programada por defecto es inmediata
+        previousState,
+        // No asignamos personal inicialmente
+        assignedTo: null
       });
   
-      // Crear solicitud general
+      // 2. Crear solicitud general
       const requestsRef = collection(db, 'hotels', hotelId, 'requests');
       await addDoc(requestsRef, {
         roomId,
@@ -68,12 +77,13 @@ import {
         status: 'pending',
         createdAt: timestamp,
         description: notes,
-        maintenanceId: maintenanceDoc.id,
+        maintenanceId: maintenanceDoc.id, // Referencia al documento de mantenimiento
         requestedBy: {
           id: user.uid,
           name: user.name,
           role: user.role
-        }
+        },
+        priority: 'medium'
       });
   
       return maintenanceDoc.id;
@@ -82,7 +92,6 @@ import {
       throw error;
     }
   }
-  
   export async function completeMaintenanceRequest(
     hotelId: string,
     roomId: string,

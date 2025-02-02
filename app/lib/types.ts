@@ -1,99 +1,116 @@
 // src/lib/types.ts
-import { Timestamp } from "firebase/firestore";
-import { ROOM_STATES, CLEANING_FLOWS } from "./constants/room-states";
+import { Timestamp } from 'firebase/firestore';
 
-// Tipos de usuarios
-export type UserRole = "super_admin" | "hotel_admin" | "staff";
-export type StaffRole =
-  | "housekeeper"
-  | "maintenance"
-  | "manager"
-  | "supervisor";
-export type UserStatus = "active" | "inactive";
+export type UserRole = 'super_admin' | 'hotel_admin' | 'supervisor';
 
-// Tipos de habitaciones
-export type RoomStatus = keyof typeof ROOM_STATES;
-export type RoomType = "single" | "double" | "suite" | "presidential";
-export type CleaningFlow = keyof typeof CLEANING_FLOWS;
+export type StaffRole = 'reception' | 'housekeeper' | 'maintenance' | 'manager';
 
 // Tipos para mantenimiento
-export type MaintenanceType = "preventive" | "corrective";
-export type MaintenanceStatus = "pending" | "in_progress" | "completed";
-export type MaintenancePriority = "low" | "medium" | "high";
-export type MaintenanceCategory =
-  | "room"
-  | "common_area"
-  | "equipment"
-  | "facility";
+export type MaintenanceType = 'preventive' | 'corrective';
+export type MaintenanceStatus = 'pending' | 'in_progress' | 'completed';
+export type MaintenancePriority = 'low' | 'medium' | 'high';
+export type MaintenanceCategory = 'room' | 'common_area' | 'equipment' | 'facility';
 
-export interface Room {
-  id: string;
-  number: string;
-  type: RoomType;
-  status: RoomStatus;
-  floor: number;
-  features: string[];
-  lastCleaned: Timestamp;
-  lastMaintenance: Timestamp;
-  lastStatusChange: Timestamp;
-  assignedTo?: string;
-  currentGuest?: {
-    name: string;
-    checkIn: Timestamp;
-    checkOut: Timestamp;
-  };
-  lastUpdatedBy?: {
-    id: string;
-    name: string;
-    role: StaffRole;
-  };
-  tiempoLimpieza?: number;
-  requiresInspection?: boolean;
+
+export interface User {
+  uid: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  hotelId?: string;
+  status: 'active' | 'inactive' | 'pending_activation';
 }
 
 export interface Staff {
   id: string;
   name: string;
-  email: string;
+  email?: string;
+  pin?: string;
   role: StaffRole;
-  phone: string;
-  status: UserStatus;
-  estado: RoomStatus;
-  createdAt: Timestamp;
+  hotelId: string;
+  status: 'active' | 'inactive';
   assignedAreas?: string[];
+  lastLogin?: Timestamp;
+  lastLoginType?: 'pin' | 'email';
   efficiency?: number;
-  tiempoPromedio?: number;
-  habitacionesCompletadas?: number;
+  assignedTasks?: number;
 }
 
-// Las demás interfaces se mantienen igual
-export interface Hotel {
+export interface Room {
   id: string;
-  hotelName: string;
-  ownerName: string;
-  email: string;
-  phone: string;
-  address: string;
-  status: "trial" | "active" | "suspended";
-  trialEndsAt: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  settings: {
-    checkInTime: string;
-    checkOutTime: string;
-    timezone: string;
+  number: string;
+  type: string;
+  floor: number;
+  status: RoomStatus;
+  features?: string[];
+  lastStatusChange?: Timestamp;
+  lastCleaned?: Timestamp;
+  lastMaintenance?: Timestamp;
+  assignedTo?: string;
+  currentMaintenance?: {
+    status: 'pending' | 'in_progress' | 'completed';
+    description: string;
+    createdAt: Timestamp;
   };
 }
 
-export interface User {
+// Estados de habitación actualizados para incluir los estados de recepción
+export type RoomStatus = 
+  | 'available'
+  | 'occupied'
+  | 'checkout'
+  | 'in_house'
+  | 'need_cleaning'
+  | 'cleaning_occupied'
+  | 'cleaning_checkout'
+  | 'cleaning_touch'
+  | 'inspection'
+  | 'maintenance'
+  | 'clean_occupied';
+
+export interface AccessLog {
+  userId: string;
+  userName: string;
+  role: UserRole | StaffRole;
+  accessType: 'pin' | 'email';
+  timestamp: Timestamp;
+  hotelId: string;
+  action?: string;
+}
+
+export interface Hotel {
   id: string;
-  email: string;
   name: string;
-  role: UserRole;
-  hotelId: string; // Asegúrate de que hotelId esté definido aquí
-  createdAt: Timestamp;
-  lastLogin: Timestamp;
-  status: UserStatus;
+  adminId?: string;
+  status: 'active' | 'inactive';
+  subscription?: {
+    plan: 'basic' | 'premium' | 'enterprise';
+    status: 'active' | 'expired' | 'cancelled';
+    expiresAt: Timestamp;
+  };
+  features?: {
+    maxRooms: number;
+    maxStaff: number;
+    modules: string[];
+  };
+}
+
+// Tipos base para notificaciones
+export interface BaseNotification {
+  id: string;
+  type: string;
+  timestamp: Timestamp;
+  status: 'unread' | 'read';
+  priority: 'low' | 'normal' | 'high';
+  targetRole: StaffRole | UserRole;
+  message?: string;
+}
+
+export interface CleaningMetrics {
+  averageTime: number;
+  completedToday: number;
+  pendingCount: number;
+  efficiency: number;
 }
 
 export interface Maintenance {
@@ -110,20 +127,23 @@ export interface Maintenance {
   startedAt?: Timestamp;
   completedAt?: Timestamp;
   scheduledFor: Timestamp;
-  timeSpent?: number;
+  timeSpent?: number; // en minutos
   notes?: string;
   images?: string[];
-  rating?: number;
+  rating?: number; // 1-5
   feedback?: string;
-  assignedTo?: string;
 }
 
-export interface StaffPerformanceMetrics {
-  totalTasks: number;
-  completedTasks: number;
-  averageTimePerTask: number;
-  averageRating: number;
-  responseTime: number;
-  tasksThisMonth: number;
-  completionRate: number;
+
+export interface MaintenanceRequest {
+  id: string;
+  roomId: string;
+  type: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  description: string;
+  priority: 'low' | 'normal' | 'high';
+  createdAt: Timestamp;
+  assignedTo?: string;
+  completedAt?: Timestamp;
+  notes?: string[];
 }
