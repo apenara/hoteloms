@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/config";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-// import { Badge } from '@/components/ui/badge';
+
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,62 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// import { Alert, AlertDescription } from '@/components/ui/alert';
+
 import {
-  // BedDouble,
-  // Loader2,
-  // Check,
-  // AlertTriangle,
-  // Clock,
-  // Paintbrush,
-  // Moon,
   Search,
   Building,
 } from "lucide-react";
 import { RoomCard } from "@/components/hotels/RoomCard";
-// import { RequestNotifications } from '@/components/dashboard/RequestNotifications';
 import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
 import { ROOM_STATES } from "@/app/lib/constants/room-states";
 import { User, Room } from "@/app/lib/types";
 import { Button } from "@/app/components/ui/button";
-
-// const ESTADOS = {
-//   available: { label: 'Disponible', icon: <Check className="h-4 w-4" />, color: 'bg-green-500 text-white' },
-//   occupied: { label: 'Ocupada', icon: <BedDouble className="h-4 w-4" />, color: 'bg-red-500 text-white' },
-//   cleaning: { label: 'Limpieza', icon: <Paintbrush className="h-4 w-4" />, color: 'bg-blue-500 text-white' },
-//   cleaning_started: { label: 'Iniciando Limpieza', icon: <Paintbrush className="h-4 w-4" />, color: 'bg-teal-800  text-white' },
-//   maintenance: { label: 'Mantenimiento', icon: <AlertTriangle className="h-4 w-4" />, color: 'bg-yellow-500 text-white' },
-//   do_not_disturb: { label: 'No Molestar', icon: <Moon className="h-4 w-4" />, color: 'bg-purple-500 text-white' },
-//   check_out: { label: 'Check-out', icon: <Clock className="h-4 w-4" />, color: 'bg-orange-500 text-white' }
-// };
-
-// Constantes para estados de habitaciones
-// const ROOM_STATES = {
-//   disponible: {
-//     color: 'bg-green-500',
-//     icon: <Check className="h-6 w-6" />,
-//   },
-//   ocupada: {
-//     color: 'bg-red-500',
-//     icon: <BedDouble className="h-6 w-6" />,
-//   },
-//   mantenimiento: {
-//     color: 'bg-yellow-500',
-//     icon: <AlertTriangle className="h-6 w-6" />,
-//   },
-//   limpieza: {
-//     color: 'bg-blue-500',
-//     icon: <Paintbrush className="h-6 w-6" />,
-//   },
-//   'no-molestar': {
-//     color: 'bg-purple-500',
-//     icon: <Moon className="h-6 w-6" />,
-//   },
-//   checkout: {
-//     color: 'bg-orange-500',
-//     icon: <Clock className="h-6 w-6" />,
-//   },
-// };
 
 const ESTADOS: Record<
   string,

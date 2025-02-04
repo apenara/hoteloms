@@ -43,6 +43,7 @@ export interface Room {
   floor: number;
   status: RoomStatus;
   features?: string[];
+  cleaningStartTime?: Timestamp;
   lastStatusChange?: Timestamp;
   lastCleaned?: Timestamp;
   lastMaintenance?: Timestamp;

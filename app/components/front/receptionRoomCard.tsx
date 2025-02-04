@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge } from "@/app/components/ui/badge";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
-  DialogTrigger 
+  DialogTrigger
 } from "@/app/components/ui/dialog";
 import {
   DropdownMenu,
@@ -16,14 +16,15 @@ import {
   DropdownMenuTrigger,
 } from "@/app/components/ui/dropdown-menu";
 import { Button } from "@/app/components/ui/button";
-//importaciones de firebas
-import { updateDoc, doc, addDoc, collection } from 'firebase/firestore';
+import { updateDoc, doc, addDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-
-// Importaciones de constantes y tipos
 import { ROOM_STATES, ROLE_STATE_FLOWS } from '@/app/lib/constants/room-states';
-import { Timer, Clock } from 'lucide-react';
+import { Timer, Clock, Bell, MessageSquare } from 'lucide-react';
 import { Card, CardContent } from '@/app/components/ui/card';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RoomProgressTimer } from '../hotels/RoomProgressTimer';
 
 interface ReceptionRoomCardProps {
   room: {
@@ -41,15 +42,52 @@ interface ReceptionRoomCardProps {
 }
 
 export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomCardProps) {
-    const [showDetails, setShowDetails] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-  
-    const statusInfo = ROOM_STATES[room.status] || ROOM_STATES.available;
-    const allowedTransitions = ROLE_STATE_FLOWS.reception[room.status] || [];
+  const [showDetails, setShowDetails] = useState(false);
+  const [showRequestsDialog, setShowRequestsDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [isNewRequest, setIsNewRequest] = useState(false);
+
+  const statusInfo = ROOM_STATES[room.status] || ROOM_STATES.available;
+  const allowedTransitions = ROLE_STATE_FLOWS.reception[room.status] || [];
+
+  // Suscripción a las solicitudes de la habitación
+  useEffect(() => {
+    const requestsRef = collection(db, 'hotels', hotelId, 'requests');
+    const requestsQuery = query(
+      requestsRef,
+      where('roomId', '==', room.id),
+      where('status', '==', 'pending')
+    );
+
+    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+      const requests = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate()
+      }));
+
+      setPendingRequests(requests);
+
+      // Verificar si hay nuevas solicitudes
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          setIsNewRequest(true);
+          // Reproducir sonido de notificación
+          // const audio = new Audio('/notification-sound.mp3');
+          // audio.play().catch(e => console.log('Error playing sound:', e));
+          // Resetear el indicador después de 5 segundos
+          setTimeout(() => setIsNewRequest(false), 5000);
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [hotelId, room.id]);
 
   const handleStateChange = async (newStatus: string) => {
     if (isLoading) return;
-    
+
     setIsLoading(true);
     try {
       const timestamp = new Date();
@@ -60,22 +98,17 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
         lastStatusChange: timestamp,
       };
 
-      // Lógica específica según el estado
       if (newStatus === 'checkout') {
         updateData.checkoutTime = timestamp;
-        // Auto transición a need_cleaning después de checkout
         setTimeout(async () => {
           await updateDoc(roomRef, {
-            // status: 'need_cleaning',
             lastStatusChange: new Date()
           });
         }, 1000);
       }
 
-      // Actualizar estado
       await updateDoc(roomRef, updateData);
 
-      // Registrar en historial
       await addDoc(collection(db, 'hotels', hotelId, 'rooms', room.id, 'history'), {
         previousStatus: room.status,
         newStatus,
@@ -85,7 +118,6 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
         userRole: 'reception'
       });
 
-      // Si es un estado prioritario, crear notificación
       if (newStatus === 'in_house' || newStatus === 'checkout') {
         await addDoc(collection(db, 'hotels', hotelId, 'notifications'), {
           type: 'status_change',
@@ -106,13 +138,29 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
     }
   };
 
-  // Calcular tiempo estimado de limpieza
+  const handleCompleteRequest = async (requestId: string) => {
+    try {
+      const requestRef = doc(db, 'hotels', hotelId, 'requests', requestId);
+      await updateDoc(requestRef, {
+        status: 'completed',
+        completedAt: new Date(),
+        completedBy: {
+          id: currentUser.id,
+          name: currentUser.name,
+          role: currentUser.role
+        }
+      });
+    } catch (error) {
+      console.error('Error completing request:', error);
+    }
+  };
+
   const getEstimatedTime = () => {
     if (!room.cleaningStartTime) return null;
     const startTime = new Date(room.cleaningStartTime);
-    const estimatedTime = room.estimatedCompletionTime ? 
-      new Date(room.estimatedCompletionTime) : 
-      new Date(startTime.getTime() + 30 * 60000); // 30 minutos por defecto
+    const estimatedTime = room.estimatedCompletionTime ?
+      new Date(room.estimatedCompletionTime) :
+      new Date(startTime.getTime() + 30 * 60000);
 
     const now = new Date();
     const remainingTime = Math.max(0, estimatedTime.getTime() - now.getTime());
@@ -122,100 +170,185 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
   };
 
   return (
-    <Card 
-    className={`relative cursor-pointer transition-all hover:shadow-lg ${statusInfo.color}`}
-    onClick={() => setShowDetails(true)}
-  >
-    <CardContent className="p-3">
-      <div className="flex justify-between items-start mb-2">
-        <span className="text-lg font-bold">{room.number}</span>
-        <statusInfo.icon className="h-5 w-5" />
-      </div>
+    <div className="relative">
+      {/* Indicador de notificación */}
+      <AnimatePresence>
+        {pendingRequests.length > 0 && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0 }}
+            className="absolute -top-2 -right-2 z-10"
+          >
+            <Badge
+              className={`bg-red-500 hover:bg-red-600 cursor-pointer ${isNewRequest ? 'animate-bounce' : ''
+                }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRequestsDialog(true);
+              }}
+            >
+              {pendingRequests.length}
+            </Badge>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="space-y-2">
-        <Badge variant="secondary" className="w-full justify-center">
-          {statusInfo.label}
-        </Badge>
-
-        {(room.status === 'need_cleaning' || room.status === 'cleaning_checkout') && (
-          <div className="flex items-center gap-1 text-sm">
-            <Timer className="h-4 w-4" />
-            <span>
-              {getEstimatedTime() ? 
-                `${getEstimatedTime()} min restantes` : 
-                'Esperando inicio'}
-            </span>
+      <Card
+        className={`relative cursor-pointer transition-all hover:shadow-lg ${statusInfo.color} ${pendingRequests.length > 0 ? 'ring-2 ring-red-500 ring-opacity-50' : ''
+          }`}
+        onClick={() => setShowDetails(true)}
+      >
+        <CardContent className="p-3">
+          <div className="flex justify-between items-start mb-2">
+            <span className="text-lg font-bold">{room.number}</span>
+            <statusInfo.icon className="h-5 w-5" />
           </div>
-        )}
 
-        {allowedTransitions.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="secondary" 
-                className="w-full"
-                disabled={isLoading}
-              >
-                Cambiar Estado
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {allowedTransitions.map((state) => (
-                <DropdownMenuItem
-                  key={state}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStateChange(state);
-                  }}
-                >
-                  {/* <ROOM_STATES[state].icon className="h-4 w-4 mr-2" /> */}
-                  {ROOM_STATES[state].label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-    </CardContent>
+          <div className="space-y-2">
+            <Badge variant="secondary" className="w-full justify-center">
+              {statusInfo.label}
+            </Badge>
 
-    {/* Modal de detalles */}
-    <Dialog open={showDetails} onOpenChange={setShowDetails}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Habitación {room.number}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-500">Estado</p>
-              <p className="font-medium">{statusInfo.label}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Tipo</p>
-              <p className="font-medium">{room.type}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Última Limpieza</p>
-              <p className="font-medium">
-                {room.lastCleaned ? 
-                  new Date(room.lastCleaned).toLocaleString() : 
-                  'No disponible'}
-              </p>
-            </div>
-            {room.cleaningStartTime && (
-              <div>
-                <p className="text-sm text-gray-500">Tiempo Estimado</p>
-                <p className="font-medium">
-                  {getEstimatedTime() ? 
-                    `${getEstimatedTime()} minutos restantes` : 
-                    'Completado'}
-                </p>
+            {(room.status.includes('cleaning_') || room.status === 'need_cleaning') && (
+              <div className="mt-2">
+                <RoomProgressTimer
+                  startTime={room.cleaningStartTime || room.lastStatusChange}
+                  expectedDuration={
+                    room.status === 'cleaning_checkout' ? 45 : // Checkout toma más tiempo
+                      room.status === 'cleaning_occupied' ? 30 : // Limpieza normal
+                        room.status === 'cleaning_touch' ? 15 : // Retoque rápido
+                          30 // Tiempo por defecto
+                  }
+                  status={room.status}
+                />
               </div>
             )}
+
+            {allowedTransitions.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    Cambiar Estado
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {allowedTransitions.map((state) => (
+                    <DropdownMenuItem
+                      key={state}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStateChange(state);
+                      }}
+                    >
+                      {ROOM_STATES[state].label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  </Card>
-    ); 
+        </CardContent>
+      </Card>
+
+      {/* Modal de detalles */}
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Habitación {room.number}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Estado</p>
+                <p className="font-medium">{statusInfo.label}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Tipo</p>
+                <p className="font-medium">{room.type}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Última Limpieza</p>
+                <p className="font-medium">
+                  {room.lastCleaned ?
+                    new Date(room.lastCleaned).toLocaleString() :
+                    'No disponible'}
+                </p>
+              </div>
+              {room.cleaningStartTime && (
+                <div>
+                  <p className="text-sm text-gray-500">Tiempo Estimado</p>
+                  <p className="font-medium">
+                    {getEstimatedTime() ?
+                      `${getEstimatedTime()} minutos restantes` :
+                      'Completado'}
+                  </p>
+                </div>
+              )}
+              {(room.status.includes('cleaning_') || room.status === 'need_cleaning') && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500 mb-2">Progreso de Limpieza</p>
+                  <RoomProgressTimer
+                    startTime={room.cleaningStartTime || room.lastStatusChange}
+                    expectedDuration={
+                      room.status === 'cleaning_checkout' ? 45 :
+                        room.status === 'cleaning_occupied' ? 30 :
+                          room.status === 'cleaning_touch' ? 15 :
+                            30
+                    }
+                    status={room.status}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de solicitudes */}
+      <Dialog open={showRequestsDialog} onOpenChange={setShowRequestsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Solicitudes - Habitación {room.number}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {pendingRequests.map((request) => (
+              <div
+                key={request.id}
+                className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg"
+              >
+                <MessageSquare className="h-5 w-5 mt-1 text-gray-500" />
+                <div className="flex-1">
+                  <div className="font-medium">
+                    {request.type === 'guest_request' ? 'Mensaje del huésped' : request.type}
+                  </div>
+                  {request.message && (
+                    <p className="text-sm text-gray-600 mt-1">{request.message}</p>
+                  )}
+                  <div className="flex items-center mt-2 text-xs text-gray-500">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {formatDistanceToNow(request.createdAt, {
+                      addSuffix: true,
+                      locale: es
+                    })}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCompleteRequest(request.id)}
+                >
+                  Completar
+                </Button>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

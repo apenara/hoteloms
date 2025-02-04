@@ -9,6 +9,9 @@ export default {
   ],
   theme: {
   	extend: {
+		animation: {
+			bounce: 'bounce 1s infinite'
+		  },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',

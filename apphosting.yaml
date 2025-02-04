@@ -58,3 +58,9 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-DSD5F1Q5CZ"
+    availability:
+      - BUILD
+      - RUNTIME

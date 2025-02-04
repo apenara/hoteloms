@@ -6,13 +6,13 @@ export const ROOM_STATES = {
   'available': {
     label: 'Disponible',
     icon: CheckCircle,
-    color: 'bg-green-100 text-green-800',
-    group: 'basic'
+    color: 'bg-emerald-100 text-emerald-800',
+    group: 'reception'
   },
   'occupied': {
     label: 'Ocupada',
     icon: BedDouble,
-    color: 'bg-blue-100 text-blue-800',
+    color: 'bg-sky-100 text-sky-800',
     group: 'reception'
   },
   'checkout': {
@@ -20,21 +20,23 @@ export const ROOM_STATES = {
     icon: Clock,
     color: 'bg-orange-100 text-orange-800',
     group: 'reception',
-    autoTransition: 'need_cleaning',  // Indica que debe pasar automáticamente a need_cleaning
-    notifyGroup: 'housekeeping'       // Indica a qué grupo notificar
+    autoTransition: 'need_cleaning',
+    notifyGroup: 'housekeeping'
   },
   'in_house': {
     label: 'En Casa',
     icon: UserCheck,
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-violet-100 text-violet-800',
     group: 'reception',
-    priority: 'high',                 // Indica prioridad alta para limpieza
-    notifyGroup: 'housekeeping'       // Indica a qué grupo notificar
+    priority: 'high',
+    notifyGroup: 'housekeeping'
   },
+
+  // Estados de Limpieza
   'need_cleaning': {
     label: 'Necesita Limpieza',
     icon: Clock,
-    color: 'bg-yellow-100 text-yellow-800',
+    color: 'bg-amber-100 text-amber-800',
     group: 'cleaning'
   },
   'cleaning_occupied': {
@@ -42,16 +44,17 @@ export const ROOM_STATES = {
     icon: Paintbrush,
     color: 'bg-yellow-100 text-yellow-800',
     group: 'cleaning'
-  },'clean_occupied': {
+  },
+  'clean_occupied': {
     label: 'Limpia Ocupada',
     icon: CheckCircle,
-    color: 'bg-yellow-100 text-yellow-800',
+    color: 'bg-teal-100 text-teal-800',
     group: 'cleaning'
   },
   'cleaning_checkout': {
     label: 'Limpieza Check-out',
     icon: Home,
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-fuchsia-100 text-fuchsia-800',
     group: 'cleaning',
     requiresInspection: true
   },
@@ -68,10 +71,12 @@ export const ROOM_STATES = {
     color: 'bg-cyan-100 text-cyan-800',
     group: 'cleaning'
   },
+
+  // Estado de Mantenimiento
   'maintenance': {
     label: 'Mantenimiento',
     icon: AlertTriangle,
-    color: 'bg-red-100 text-red-800',
+    color: 'bg-rose-100 text-rose-800',
     group: 'maintenance'
   }
 } as const;
