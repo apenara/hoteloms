@@ -143,9 +143,9 @@ export default function HotelDashboard() {
 
   const [estadoFiltrado, setEstadoFiltrado] = useState("todos");
 
-  // Actualiza la función de filtrado para incluir el filtro por estado
   const habitacionesFiltradas = useMemo(() => {
-    return habitaciones.filter((habitacion) => {
+    // Primero filtramos las habitaciones
+    const habitacionesFiltradas = habitaciones.filter((habitacion) => {
       const cumpleFiltoPiso =
         pisoSeleccionado === "todos" ||
         habitacion.floor.toString() === pisoSeleccionado;
@@ -155,6 +155,14 @@ export default function HotelDashboard() {
       const cumpleFiltroEstado =
         estadoFiltrado === "todos" || habitacion.status === estadoFiltrado;
       return cumpleFiltoPiso && cumpleBusqueda && cumpleFiltroEstado;
+    });
+
+    // Luego ordenamos las habitaciones
+    return habitacionesFiltradas.sort((a, b) => {
+      // Convertimos los números de habitación a enteros para comparación numérica
+      const numA = parseInt(a.number.replace(/\D/g, ''));
+      const numB = parseInt(b.number.replace(/\D/g, ''));
+      return numA - numB;
     });
   }, [habitaciones, pisoSeleccionado, busqueda, estadoFiltrado]);
 
