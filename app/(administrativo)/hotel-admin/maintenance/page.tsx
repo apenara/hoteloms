@@ -10,14 +10,11 @@ import {
   where,
   orderBy,
   DocumentData,
-  Timestamp
+  Timestamp,
+  addDoc,
+  deleteDoc,
+  doc
 } from "firebase/firestore";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,51 +23,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MaintenanceFormDialog from "@/components/maintenance/MaintenanceFormDialog";
 import MaintenanceStats from "@/components/maintenance/MaintenanceStats";
 import StaffEfficiencyView from "@/components/maintenance/StaffEfficiencyView";
-import { Maintenance, User, Staff } from "@/app/lib/types";
 import MaintenanceList from "@/app/components/maintenance/MaintenanceList";
 import { toast } from "@/app/hooks/use-toast";
-
-interface MaintenanceStaff extends Staff {
-  stats?: {
-    completed: number;
-    total: number;
-    efficiency: number;
-    avgTime: number;
-  };
-  tasks?: Maintenance[];
-}
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/app/components/ui/tooltip";
+import MaintenanceRequestCard from "@/app/components/maintenance/MaintenanceRequestCard";
 
 const MaintenancePage = () => {
-  const { user } = useAuth() as { user: User | null };
-  const [maintenanceList, setMaintenanceList] = useState<Maintenance[]>([]);
-  const [maintenanceStaff, setMaintenanceStaff] = useState<MaintenanceStaff[]>([]);
+  const { user } = useAuth();
+  const [maintenanceList, setMaintenanceList] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [maintenanceStaff, setMaintenanceStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [selectedStaff, setSelectedStaff] = useState<MaintenanceStaff | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState(null);
   const [error, setError] = useState<string | null>(null);
-  const [copiedStaffId, setCopiedStaffId] = useState(null);
-
-  
-//creamos link para enviar a la vista de mantenimiento
-  const handleCopyAccessLink = (staffMember) => {
-    const baseUrl = window.location.origin;
-    const accessLink = `${baseUrl}/maintenance/${user.hotelId}/login`;
-    
-    navigator.clipboard.writeText(accessLink).then(() => {
-      setCopiedStaffId(staffMember.id);
-      toast({
-        title: "Enlace copiado",
-        description: "Enlace de acceso copiado al portapapeles",
-      });
-      
-      // Resetear el ícono después de 2 segundos
-      setTimeout(() => {
-        setCopiedStaffId(null);
-      }, 2000);
-    });
-  };
+const [copiedStaffId, setCopiedStaffId] = useState<string | null>(null); // Añadir esta línea
 
   // Función para cargar datos de mantenimiento
   const fetchMaintenanceData = async () => {
@@ -78,31 +47,46 @@ const MaintenancePage = () => {
       if (!user?.hotelId) return;
       setLoading(true);
       
-      // 1. Obtener todas las tareas de mantenimiento
+      // 1. Obtener solicitudes pendientes de mantenimiento
+      const requestsRef = collection(db, "hotels", user.hotelId, "requests");
+      const requestsQuery = query(
+        requestsRef, 
+        where("category", "==", "maintenance"),
+        where("status", "==", "pending"),
+        orderBy("createdAt", "desc")
+      );
+      const requestsSnap = await getDocs(requestsQuery);
+      const requestsData = requestsSnap.docs.map(doc => ({
+        id: doc.id,
+        isRequest: true, // Flag para identificar que es una solicitud
+        ...doc.data()
+      }));
+      setPendingRequests(requestsData);
+
+      // 2. Obtener mantenimientos existentes
       const maintenanceRef = collection(db, "hotels", user.hotelId, "maintenance");
       const maintenanceSnap = await getDocs(query(maintenanceRef, orderBy("createdAt", "desc")));
-      const maintenanceData = maintenanceSnap.docs.map((doc) => ({
+      const maintenanceData = maintenanceSnap.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-      })) as Maintenance[];
+        ...doc.data()
+      }));
 
-      setMaintenanceList(maintenanceData);
+      // Combinar solicitudes y mantenimientos
+      const combinedList = [...requestsData, ...maintenanceData];
+      setMaintenanceList(combinedList);
 
-      // 2. Obtener personal de mantenimiento
+      // 3. Obtener personal de mantenimiento
       const staffRef = collection(db, "hotels", user.hotelId, "staff");
       const staffQuery = query(staffRef, where("role", "==", "maintenance"));
       const staffSnap = await getDocs(staffQuery);
       
-      // 3. Procesar datos del personal y sus estadísticas
       const staffData = await Promise.all(staffSnap.docs.map(async (doc) => {
-        const staffMember = { id: doc.id, ...doc.data() } as MaintenanceStaff;
+        const staffMember = { id: doc.id, ...doc.data() };
         const staffTasks = maintenanceData.filter(m => m.assignedTo === doc.id);
         
-        // Calcular estadísticas
         const completed = staffTasks.filter(t => t.status === 'completed');
         const efficiency = staffTasks.length ? (completed.length / staffTasks.length) * 100 : 0;
         
-        // Calcular tiempo promedio
         let totalTime = 0;
         completed.forEach(task => {
           if (task.completedAt && task.createdAt) {
@@ -131,6 +115,63 @@ const MaintenancePage = () => {
       setLoading(false);
     }
   };
+  const handleCopyAccessLink = (staffMember: any) => {
+    const baseUrl = window.location.origin;
+    const accessLink = `${baseUrl}/maintenance/${user?.hotelId}/staff`;
+    
+    navigator.clipboard.writeText(accessLink).then(() => {
+      setCopiedStaffId(staffMember.id);
+      toast({
+        title: "Enlace copiado",
+        description: "Enlace de acceso copiado al portapapeles",
+      });
+      
+      // Resetear el ícono después de 2 segundos
+      setTimeout(() => {
+        setCopiedStaffId(null);
+      }, 2000);
+    });
+  };
+  // Función para convertir una solicitud en mantenimiento
+  const convertRequestToMaintenance = async (request, staffId, scheduledDate) => {
+    try {
+      const maintenanceRef = collection(db, "hotels", user.hotelId, "maintenance");
+      
+      // Crear nuevo documento de mantenimiento
+      await addDoc(maintenanceRef, {
+        roomId: request.roomId,
+        roomNumber: request.roomNumber,
+        location: request.location || `Habitación ${request.roomNumber}`,
+        description: request.description,
+        priority: request.priority || "medium",
+        status: "pending",
+        assignedTo: staffId,
+        scheduledFor: Timestamp.fromDate(new Date(scheduledDate)),
+        createdAt: request.createdAt,
+        source: "guest_request",
+        type: "corrective"
+      });
+
+      // Actualizar la solicitud original
+      const requestRef = doc(db, "hotels", user.hotelId, "requests", request.id);
+      await deleteDoc(requestRef);
+
+      // Recargar datos
+      await fetchMaintenanceData();
+      
+      toast({
+        title: "Solicitud convertida",
+        description: "La solicitud ha sido asignada correctamente",
+      });
+    } catch (error) {
+      console.error("Error al convertir solicitud:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo convertir la solicitud",
+        variant: "destructive"
+      });
+    }
+  };
 
   useEffect(() => {
     if (user?.hotelId) {
@@ -148,7 +189,7 @@ const MaintenancePage = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Cabecera con búsqueda y botón de nuevo */}
+      {/* Header y componentes existentes */}
       <div className="flex justify-between items-center">
         <div className="flex-1 max-w-sm relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -165,6 +206,24 @@ const MaintenancePage = () => {
         </Button>
       </div>
 
+      {/* Mostrar solicitudes pendientes si existen */}
+      {pendingRequests.length > 0 && (
+        <Card className="p-4">
+          <h3 className="text-lg font-medium mb-4">
+            Solicitudes Pendientes ({pendingRequests.length})
+          </h3>
+          <div className="space-y-4">
+            {pendingRequests.map(request => (
+              <MaintenanceRequestCard
+                key={request.id}
+                request={request}
+                staff={maintenanceStaff}
+                onAssign={convertRequestToMaintenance}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
       {/* Tabs principales */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

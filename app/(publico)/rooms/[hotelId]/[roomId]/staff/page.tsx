@@ -182,7 +182,6 @@ export default function StaffRoomView() {
       setProcesando(false);
     }
   };
-
   const getAvailableStates = () => {
     if (!currentUser || !room) return [];
     let states = [];

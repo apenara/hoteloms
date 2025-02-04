@@ -27,34 +27,49 @@ const MaintenanceStats = ({ maintenanceList = [], loading = false }: Maintenance
 
   useEffect(() => {
     if (!maintenanceList || maintenanceList.length === 0) return;
-
+  
     const now = new Date();
     const completed = maintenanceList.filter(m => m.status === 'completed');
     const inProgress = maintenanceList.filter(m => m.status === 'in_progress');
     const pending = maintenanceList.filter(m => m.status === 'pending');
+    
+    // Modificar la lógica de overdue para manejar casos donde scheduledFor no existe
     const overdue = maintenanceList.filter(m => {
       if (m.status === 'completed') return false;
-      const scheduledDate = new Date(m.scheduledFor.seconds * 1000);
-      return scheduledDate < now;
+      if (!m.scheduledFor) return false; // Verificar si existe scheduledFor
+      
+      try {
+        const scheduledDate = new Date(m.scheduledFor.seconds * 1000);
+        return scheduledDate < now;
+      } catch (error) {
+        console.warn('Error al procesar fecha programada:', error);
+        return false;
+      }
     });
-
-    // Calcular tiempo promedio de finalización
-    const completionTimes = completed.map(m => {
-      if (!m.completedAt || !m.createdAt) return 0;
-      return (m.completedAt.seconds - m.createdAt.seconds) / 3600; // en horas
-    });
-    
+  
+    // Calcular tiempo promedio de finalización de manera segura
+    const completionTimes = completed
+      .filter(m => m.completedAt && m.createdAt) // Solo incluir registros con ambas fechas
+      .map(m => {
+        try {
+          return (m.completedAt.seconds - m.createdAt.seconds) / 3600;
+        } catch (error) {
+          console.warn('Error al calcular tiempo de finalización:', error);
+          return 0;
+        }
+      });
+  
     const avgTime = completionTimes.length 
       ? completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length 
       : 0;
-
-    // Estadísticas por prioridad
+  
+    // Estadísticas por prioridad de manera segura
     const byPriority = {
       high: maintenanceList.filter(m => m.priority === 'high').length,
       medium: maintenanceList.filter(m => m.priority === 'medium').length,
       low: maintenanceList.filter(m => m.priority === 'low').length
     };
-
+  
     setStats({
       total: maintenanceList.length,
       completed: completed.length,
@@ -64,7 +79,7 @@ const MaintenanceStats = ({ maintenanceList = [], loading = false }: Maintenance
       avgCompletionTime: avgTime,
       byPriority,
     });
-
+  
   }, [maintenanceList]);
 
   if (loading) {
