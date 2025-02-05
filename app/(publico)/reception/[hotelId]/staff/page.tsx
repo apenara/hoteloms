@@ -17,17 +17,19 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NotificationsDialog } from '@/components/dashboard/NotificationsDialog';
 import { ROOM_STATES, ROLE_PERMISSIONS } from '@/app/lib/constants/room-states';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { Search, Building, Clock, MessageSquare } from 'lucide-react';
+import { Search, Building, Clock, MessageSquare, LogOut } from 'lucide-react';
 import { ReceptionRoomCard } from '@/app/components/front/receptionRoomCard';
 import { toast } from '@/app/hooks/use-toast';
 import { Badge } from '@/app/components/ui/badge';
+import { GuestRequestDialog } from '@/app/components/front/GuestRequestDialog';
 
 
 export default function ReceptionStaffPage() {
   const params = useParams();
-  const { staff } = useAuth();
+  const { staff, signOut } = useAuth();
+  const [hotelData, setHotelData] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,25 @@ export default function ReceptionStaffPage() {
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedRequestFilter, setSelectedRequestFilter] = useState('pending');
+
+
+
+  useEffect(() => {
+    const fetchHotelData = async () => {
+      try {
+        const hotelDoc = await getDoc(doc(db, 'hotels', params.hotelId));
+        if (hotelDoc.exists()) {
+          setHotelData({ id: hotelDoc.id, ...hotelDoc.data() });
+        }
+      } catch (error) {
+        console.error('Error fetching hotel:', error);
+      }
+    };
+
+    if (params.hotelId) {
+      fetchHotelData();
+    }
+  }, [params.hotelId]);
 
   useEffect(() => {
     if (!staff || staff.role !== 'reception') {
@@ -103,7 +124,7 @@ export default function ReceptionStaffPage() {
     try {
       const requestRef = doc(db, 'hotels', params.hotelId, 'requests', request.id);
       const timestamp = Timestamp.now();
-      
+
       await updateDoc(requestRef, {
         status: 'completed',
         completedAt: timestamp,
@@ -138,18 +159,18 @@ export default function ReceptionStaffPage() {
     const regex = /([a-zA-Z]*)(\d*)/;
     const [, aLetters, aNumbers] = a.number.match(regex) || [];
     const [, bLetters, bNumbers] = b.number.match(regex) || [];
-  
+
     if (aLetters < bLetters) return -1;
     if (aLetters > bLetters) return 1;
-  
+
     const aNum = parseInt(aNumbers, 10);
     const bNum = parseInt(bNumbers, 10);
     return aNum - bNum;
   };
-  
+
   // Ordenar las habitaciones
   const sortedRooms = filteredRooms.sort(sortRooms);
-  
+
 
   if (error) {
     return (
@@ -170,8 +191,34 @@ export default function ReceptionStaffPage() {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle className="text-2xl font-bold">Panel de Recepción</CardTitle>
-            <NotificationsDialog hotelId={params.hotelId} />
+            <div>
+              <CardTitle className="text-2xl font-bold">
+                {hotelData?.hotelName || 'Cargando...'}
+              </CardTitle>
+              <p className="text-sm text-gray-500">
+                Usuario: {staff?.name} ({staff?.role})
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <GuestRequestDialog
+                hotelId={params.hotelId}
+                rooms={rooms}
+                onRequestCreated={() => {
+                  toast({
+                    title: "Solicitud creada",
+                    description: "Se ha creado una nueva solicitud exitosamente"
+                  })
+                }}
+              />
+              <NotificationsDialog hotelId={params.hotelId} />
+              <Button
+                variant="outline"
+                onClick={() => signOut()}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Cerrar Sesión
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
@@ -222,9 +269,8 @@ export default function ReceptionStaffPage() {
                     .map(([status, config]) => (
                       <Card
                         key={status}
-                        className={`p-2 cursor-pointer ${config.color} ${
-                          selectedStatus === status ? 'ring-2 ring-offset-2' : ''
-                        }`}
+                        className={`p-2 cursor-pointer ${config.color} ${selectedStatus === status ? 'ring-2 ring-offset-2' : ''
+                          }`}
                         onClick={() => setSelectedStatus(
                           status === selectedStatus ? 'all' : status
                         )}
