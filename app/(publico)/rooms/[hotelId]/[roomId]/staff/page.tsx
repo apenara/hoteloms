@@ -121,6 +121,7 @@ export default function StaffRoomView() {
       return;
     }
   
+    // Solo requerir notas para mantenimiento
     if (newState === 'maintenance' && !notes.trim()) {
       setErrorMessage('Por favor, añade una nota describiendo el problema de mantenimiento');
       setShowErrorDialog(true);
@@ -130,16 +131,16 @@ export default function StaffRoomView() {
     try {
       setProcesando(true);
   
-      // Registrar el cambio de estado usando el ID correcto
+      // Registrar el cambio de estado
       await registrarCambioEstado(
         params.hotelId,
         params.roomId,
-        currentUser.id, // Usar id en lugar de uid
+        currentUser.id,
         newState,
         notes.trim() || undefined
       );
   
-      // Si el estado es mantenimiento, crear una solicitud
+      // Solo crear solicitud si es mantenimiento
       if (newState === 'maintenance') {
         const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
         await addDoc(requestsRef, {
@@ -193,7 +194,11 @@ export default function StaffRoomView() {
           case 'available':
           case 'occupied':
           case 'clean_occupied': 
-            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch', 'do_not_disturb'];
+            break;
+          case 'do_not_disturb':
+            // Permitir volver a estados normales cuando el huésped lo permita
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch','do_not_disturb'];
             break;
           case 'cleaning_occupied':
             states = ['clean_occupied'];
@@ -206,7 +211,7 @@ export default function StaffRoomView() {
             states = ['available'];
             break;
           case 'need_cleaning':
-            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch', 'do_not_disturb'];
             break;
           default:
             states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
@@ -221,11 +226,12 @@ export default function StaffRoomView() {
     }
   
     // Mantenimiento siempre disponible para todo el personal
-    states.push('maintenance');
+    if (!states.includes('maintenance')) {
+      states.push('maintenance');
+    }
     
     return states;
   };
-
   if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

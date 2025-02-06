@@ -25,6 +25,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RoomProgressTimer } from '../hotels/RoomProgressTimer';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { RoomHistory } from './RoomHistory';
 
 interface ReceptionRoomCardProps {
   room: {
@@ -257,55 +259,67 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
 
       {/* Modal de detalles */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>Habitación {room.number}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Estado</p>
-                <p className="font-medium">{statusInfo.label}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Tipo</p>
-                <p className="font-medium">{room.type}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Última Limpieza</p>
-                <p className="font-medium">
-                  {room.lastCleaned ?
-                    new Date(room.lastCleaned).toLocaleString() :
-                    'No disponible'}
-                </p>
-              </div>
-              {room.cleaningStartTime && (
+          
+          <Tabs defaultValue="details" className="mt-4">
+            <TabsList>
+              <TabsTrigger value="details">Detalles</TabsTrigger>
+              <TabsTrigger value="history">Historial</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" className="mt-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">Tiempo Estimado</p>
+                  <p className="text-sm text-gray-500">Estado</p>
+                  <p className="font-medium">{statusInfo.label}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Tipo</p>
+                  <p className="font-medium">{room.type}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Última Limpieza</p>
                   <p className="font-medium">
-                    {getEstimatedTime() ?
-                      `${getEstimatedTime()} minutos restantes` :
-                      'Completado'}
+                    {room.lastCleaned ?
+                      new Date(room.lastCleaned).toLocaleString() :
+                      'No disponible'}
                   </p>
                 </div>
-              )}
-              {(room.status.includes('cleaning_') || room.status === 'need_cleaning') && (
-                <div className="col-span-2">
-                  <p className="text-sm text-gray-500 mb-2">Progreso de Limpieza</p>
-                  <RoomProgressTimer
-                    startTime={room.cleaningStartTime || room.lastStatusChange}
-                    expectedDuration={
-                      room.status === 'cleaning_checkout' ? 45 :
-                        room.status === 'cleaning_occupied' ? 30 :
-                          room.status === 'cleaning_touch' ? 15 :
-                            30
-                    }
-                    status={room.status}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
+                {room.cleaningStartTime && (
+                  <div>
+                    <p className="text-sm text-gray-500">Tiempo Estimado</p>
+                    <p className="font-medium">
+                      {getEstimatedTime() ?
+                        `${getEstimatedTime()} minutos restantes` :
+                        'Completado'}
+                    </p>
+                  </div>
+                )}
+                {(room.status.includes('cleaning_') || room.status === 'need_cleaning') && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-500 mb-2">Progreso de Limpieza</p>
+                    <RoomProgressTimer
+                      startTime={room.cleaningStartTime || room.lastStatusChange}
+                      expectedDuration={
+                        room.status === 'cleaning_checkout' ? 45 :
+                          room.status === 'cleaning_occupied' ? 30 :
+                            room.status === 'cleaning_touch' ? 15 :
+                              30
+                      }
+                      status={room.status}
+                    />
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="history" className="mt-4">
+              <RoomHistory roomId={room.id} hotelId={hotelId} />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

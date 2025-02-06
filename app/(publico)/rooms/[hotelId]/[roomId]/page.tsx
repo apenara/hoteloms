@@ -74,7 +74,7 @@ export default function PublicRoomView() {
       if (!hasPermission(staffMember.role, 'canChangeRoomStatus')) {
         throw new Error('No tienes permisos para acceder a esta sección');
       }
-      
+
       // Crear el objeto de acceso
       const staffAccess = {
         id: staffMember.id,
@@ -86,16 +86,16 @@ export default function PublicRoomView() {
         accessType: 'pin',
         timestamp: new Date().toISOString()
       };
-      
+
       // Guardar en localStorage
       localStorage.setItem('staffAccess', JSON.stringify(staffAccess));
-      
+
       // Guardar en sessionStorage
       sessionStorage.setItem('currentStaffSession', JSON.stringify({
         ...staffAccess,
         sessionStart: new Date().toISOString()
       }));
-      
+
       // Registrar el acceso
       await logAccess({
         userId: staffMember.id,
@@ -106,7 +106,7 @@ export default function PublicRoomView() {
         roomId: params.roomId,
         action: 'room_access'
       });
-      
+
       // Redireccionar
       window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
     } catch (error) {
@@ -121,7 +121,7 @@ export default function PublicRoomView() {
       if (!hasPermission(user.role, 'canAccessOperationalPages')) {
         throw new Error('No tienes permisos para acceder a esta sección');
       }
-      
+
       // Registrar el acceso
       await logAccess({
         userId: user.id,
@@ -132,7 +132,7 @@ export default function PublicRoomView() {
         roomId: params.roomId,
         action: 'room_access'
       });
-      
+
       // Redireccionar
       window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
     } catch (error) {
@@ -143,32 +143,12 @@ export default function PublicRoomView() {
 
   const handleStatusChange = async (newStatus) => {
     if (!params?.hotelId || !params?.roomId) return;
-
+  
     try {
-      const roomRef = doc(db, 'hotels', params.hotelId, 'rooms', params.roomId);
       const timestamp = new Date();
-
-      await updateDoc(roomRef, {
-        status: newStatus,
-        lastStatusChange: timestamp
-      });
-
-      // Registrar en el historial con más detalles
-      const historyRef = collection(db, 'hotels', params.hotelId, 'rooms', params.roomId, 'history');
-      await addDoc(historyRef, {
-        previousStatus: room?.status || 'unknown',
-        newStatus,
-        timestamp,
-        source: 'guest',
-        notes: `Solicitud de huésped: ${newStatus}`,
-        room: {
-          number: room?.number,
-          id: room?.id
-        }
-      });
-
-      // Crear una solicitud más detallada
       const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
+  
+      // Crear solicitud con más detalles
       await addDoc(requestsRef, {
         roomId: params.roomId,
         roomNumber: room?.number,
@@ -179,13 +159,28 @@ export default function PublicRoomView() {
         priority: newStatus === 'need_cleaning' ? 'high' : 'medium',
         details: {
           previousStatus: room?.status,
-          requestType: 'guest_initiated'
+          requestType: 'guest_initiated',
+          guestRequest: true
         }
       });
-
+  
+      // Registrar en historial
+      const historyRef = collection(db, 'hotels', params.hotelId, 'rooms', params.roomId, 'history');
+      await addDoc(historyRef, {
+        type: 'guest_request',
+        requestType: newStatus,
+        timestamp,
+        source: 'guest',
+        notes: `Solicitud de huésped: ${newStatus}`,
+        room: {
+          number: room?.number,
+          id: room?.id
+        }
+      });
+  
       setSuccessMessage('Solicitud enviada correctamente');
       setTimeout(() => setSuccessMessage(''), 3000);
-      setRoom(prev => ({ ...prev, status: newStatus }));
+  
     } catch (error) {
       console.error('Error:', error);
       setError('Error al procesar la solicitud');
@@ -255,19 +250,13 @@ export default function PublicRoomView() {
             <Button
               className="flex flex-col items-center p-6 h-auto"
               variant="outline"
-              onClick={() => handleStatusChange('do_not_disturb')}
-            >
-              <Moon className="h-8 w-8 mb-2" />
-              <span>No Molestar</span>
-            </Button>
-
-            <Button
-              className="flex flex-col items-center p-6 h-auto"
-              variant="outline"
               onClick={() => handleStatusChange('need_cleaning')}
             >
               <Paintbrush className="h-8 w-8 mb-2" />
               <span>Solicitar Limpieza</span>
+              <span className="text-xs text-gray-500 mt-1">
+                Servicio de limpieza
+              </span>
             </Button>
 
             <Button
@@ -277,15 +266,21 @@ export default function PublicRoomView() {
             >
               <Waves className="h-8 w-8 mb-2" />
               <span>Solicitar Toallas</span>
+              <span className="text-xs text-gray-500 mt-1">
+                Toallas adicionales
+              </span>
             </Button>
 
             <Button
-              className="flex flex-col items-center p-6 h-auto"
+              className="flex flex-col items-center p-6 h-auto col-span-2"
               variant="outline"
               onClick={() => setShowMessageDialog(true)}
             >
               <MessageSquare className="h-8 w-8 mb-2" />
               <span>Enviar Mensaje</span>
+              <span className="text-xs text-gray-500 mt-1">
+                Contactar a recepción
+              </span>
             </Button>
           </div>
 

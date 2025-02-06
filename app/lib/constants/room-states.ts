@@ -1,5 +1,5 @@
 // src/lib/constants/room-states.ts
-import { Clock, BedDouble, Paintbrush, AlertTriangle, CheckCircle, Trash2, Home, Sparkles, UserCheck } from 'lucide-react';
+import { Clock, BedDouble, Paintbrush, AlertTriangle, CheckCircle, Trash2, Home, Sparkles, UserCheck, Moon } from 'lucide-react';
 
 export const ROOM_STATES = {
   // Estados básicos
@@ -71,6 +71,13 @@ export const ROOM_STATES = {
     color: 'bg-cyan-100 text-cyan-800',
     group: 'cleaning'
   },
+  'do_not_disturb': {
+  label: 'No Molestar',
+  icon: Moon,
+  color: 'bg-black-100 text-black-800',
+  group: 'cleaning'
+},
+
 
   // Estado de Mantenimiento
   'maintenance': {
@@ -86,19 +93,20 @@ export type RoomStatus = keyof typeof ROOM_STATES;
 // Flujos de estado permitidos por rol
 export const ROLE_STATE_FLOWS = {
   reception: {
-    'available': ['occupied', 'in_house'],
+    'available': ['occupied'],
     'occupied': ['checkout'],
     'clean_occupied': ['checkout'],
-    // 'checkout': ['need_cleaning'],
+    'checkout': ['in_house'],
     'in_house': ['occupied'],
     'inspection': ['occupied', 'in_house'],
     'need_cleaning': [] // Solo lectura
   },
   housekeeper: {
     'need_cleaning': ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'],
-    'cleaning_occupied': ['clean_occupied'],
+    'cleaning_occupied': ['clean_occupied', 'do_not_disturb'],
     'cleaning_checkout': ['inspection'],
-    'cleaning_touch': ['inspection']
+    'cleaning_touch': ['inspection'],
+    'do_not_disturb': ['cleaning_occupied', 'cleaning_checkout'] // Poder volver a cleaning cuando el huésped ya no está
   },
   supervisor: {
     'inspection': ['available']
