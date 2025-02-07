@@ -70,6 +70,16 @@ const MaintenanceFormDialog = ({
     assignedTo: ''
   });
 
+  const parseRoomNumber = (roomNumber: string) => {
+    if (!roomNumber) return { prefix: '', num: 0 };
+    const match = roomNumber.match(/([A-Za-z]*)(\d+)/);
+    if (!match) return { prefix: '', num: 0 };
+    return {
+      prefix: match[1].toUpperCase(),
+      num: parseInt(match[2])
+    };
+  };
+
   useEffect(() => {
     const fetchRoomsAndStaff = async () => {
       if (!hotelId) return;
@@ -83,7 +93,20 @@ const MaintenanceFormDialog = ({
           id: doc.id,
           ...doc.data()
         })) as Room[];
-        setRooms(roomsData);
+        const sortedRooms = roomsData.sort((a, b) => {
+          const roomA = parseRoomNumber(a.number);
+          const roomB = parseRoomNumber(b.number);
+          
+          // Primero ordenar por prefijo
+          if (roomA.prefix !== roomB.prefix) {
+            return roomA.prefix.localeCompare(roomB.prefix);
+          }
+          
+          // Si tienen el mismo prefijo, ordenar por número
+          return roomA.num - roomB.num;
+        });
+        
+        setRooms(sortedRooms);
 
         // Obtener personal de mantenimiento
         const staffRef = collection(db, 'hotels', hotelId, 'staff');

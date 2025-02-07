@@ -1,5 +1,4 @@
-"use client";
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,13 +35,52 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
         maintenanceType: ''
     });
 
+    // Ordenar habitaciones usando useMemo para mejorar el rendimiento
+    // Función para separar letra y número de una habitación
+    const parseRoomNumber = (roomNumber) => {
+        if (!roomNumber) return { prefix: '', num: 0 };
+        // Extraer el prefijo (letras) y el número
+        const match = roomNumber.match(/([A-Za-z]*)(\d+)/);
+        if (!match) return { prefix: '', num: 0 };
+        return {
+            prefix: match[1].toUpperCase(),
+            num: parseInt(match[2])
+        };
+    };
+
+    const sortedRooms = useMemo(() => {
+        if (!Array.isArray(rooms)) return [];
+        
+        return [...rooms].sort((a, b) => {
+            const roomA = parseRoomNumber(a?.number);
+            const roomB = parseRoomNumber(b?.number);
+            
+            // Primero ordenar por prefijo
+            if (roomA.prefix !== roomB.prefix) {
+                return roomA.prefix.localeCompare(roomB.prefix);
+            }
+            
+            // Si tienen el mismo prefijo, ordenar por número
+            return roomA.num - roomB.num;
+        });
+    }, [rooms]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!selectedRoom) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Por favor selecciona una habitación."
+            });
+            return;
+        }
+
         setLoading(true);
 
-        const selectedRoomData = rooms.find(room => room.id === selectedRoom);
-        
         try {
+            const selectedRoomData = sortedRooms.find(room => room.id === selectedRoom);
+            
             const baseRequest = {
                 roomId: selectedRoom,
                 roomNumber: selectedRoomData?.number,
@@ -60,29 +98,20 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
                     ...baseRequest,
                     type: 'maintenance',
                     maintenanceType,
-                    priority: maintenanceConfig.priority,
-                    requiresBlocking: maintenanceConfig.requiresBlocking
+                    priority: maintenanceConfig?.priority || 'medium',
+                    requiresBlocking: maintenanceConfig?.requiresBlocking || false
                 };
 
                 await addDoc(collection(db, 'hotels', hotelId, 'requests'), maintenanceRequest);
 
-                // Si requiere bloqueo, actualizar estado de la habitación
-                if (maintenanceConfig.requiresBlocking) {
+                if (maintenanceConfig?.requiresBlocking) {
                     const roomRef = doc(db, 'hotels', hotelId, 'rooms', selectedRoom);
                     await updateDoc(roomRef, {
                         status: 'blocked_maintenance',
                         lastStatusChange: serverTimestamp()
                     });
-                } else if (selectedRoomData.status === 'occupied') {
-                    // Si está ocupada, marcar como ocupada con mantenimiento pendiente
-                    const roomRef = doc(db, 'hotels', hotelId, 'rooms', selectedRoom);
-                    await updateDoc(roomRef, {
-                        status: 'occupied_maintenance',
-                        lastStatusChange: serverTimestamp()
-                    });
                 }
             } else {
-                // Solicitudes normales de housekeeping
                 const request = {
                     ...baseRequest,
                     ...formData,
@@ -98,13 +127,7 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
 
             setOpen(false);
             onRequestCreated?.();
-            setFormData({
-                department: '',
-                type: '',
-                description: '',
-                priority: 'medium',
-                maintenanceType: ''
-            });
+            resetForm();
         } catch (error) {
             console.error('Error:', error);
             toast({
@@ -117,7 +140,16 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
         }
     };
 
-    const currentTypes = formData.department ? REQUEST_TYPES[formData.department] : [];
+    const resetForm = () => {
+        setFormData({
+            department: '',
+            type: '',
+            description: '',
+            priority: 'medium',
+            maintenanceType: ''
+        });
+        setSelectedRoom('');
+    };
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -130,13 +162,17 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <label>Habitación</label>
-                        <Select value={selectedRoom} onValueChange={setSelectedRoom} required>
+                        <label className="text-sm font-medium">Habitación</label>
+                        <Select
+                            value={selectedRoom}
+                            onValueChange={setSelectedRoom}
+                            required
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Seleccionar habitación" />
                             </SelectTrigger>
                             <SelectContent>
-                                {rooms.map(room => (
+                                {sortedRooms.map((room) => (
                                     <SelectItem key={room.id} value={room.id}>
                                         Habitación {room.number} - {room.status}
                                     </SelectItem>
@@ -144,7 +180,7 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
                             </SelectContent>
                         </Select>
 
-                        <label>Departamento</label>
+                        <label className="text-sm font-medium">Departamento</label>
                         <Select
                             value={formData.department}
                             onValueChange={(value) => setFormData({ 
@@ -152,6 +188,7 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
                                 department: value, 
                                 type: '' 
                             })}
+                            required
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Seleccionar departamento" />
@@ -165,16 +202,17 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
 
                     {formData.department && (
                         <div className="space-y-2">
-                            <label>Tipo de Solicitud</label>
+                            <label className="text-sm font-medium">Tipo de Solicitud</label>
                             <Select
                                 value={formData.type}
                                 onValueChange={(value) => setFormData({ ...formData, type: value })}
+                                required
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar tipo" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {currentTypes.map((type) => (
+                                    {REQUEST_TYPES[formData.department]?.map((type) => (
                                         <SelectItem key={type.value} value={type.value}>
                                             <div className="flex flex-col">
                                                 <span>{type.label}</span>
@@ -191,10 +229,11 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
 
                     {formData.department === 'housekeeping' && (
                         <div className="space-y-2">
-                            <label>Prioridad</label>
+                            <label className="text-sm font-medium">Prioridad</label>
                             <Select
                                 value={formData.priority}
                                 onValueChange={(value) => setFormData({ ...formData, priority: value })}
+                                required
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccionar prioridad" />
@@ -209,7 +248,7 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
                     )}
 
                     <div className="space-y-2">
-                        <label>Descripción</label>
+                        <label className="text-sm font-medium">Descripción</label>
                         <Textarea
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -219,7 +258,14 @@ export function GuestRequestDialog({ hotelId, rooms, onRequestCreated }) {
                     </div>
 
                     <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setOpen(false)}>
+                        <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => {
+                                setOpen(false);
+                                resetForm();
+                            }}
+                        >
                             Cancelar
                         </Button>
                         <Button type="submit" disabled={loading}>
