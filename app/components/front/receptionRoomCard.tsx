@@ -18,7 +18,7 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { updateDoc, doc, addDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { ROOM_STATES, ROLE_STATE_FLOWS } from '@/app/lib/constants/room-states';
+import { ROOM_STATES, ROLE_STATE_FLOWS, MAINTENANCE_REQUEST_TYPES } from '@/app/lib/constants/room-states';
 import { Timer, Clock, Bell, MessageSquare } from 'lucide-react';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
@@ -263,7 +263,7 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
           <DialogHeader>
             <DialogTitle>Habitación {room.number}</DialogTitle>
           </DialogHeader>
-          
+
           <Tabs defaultValue="details" className="mt-4">
             <TabsList>
               <TabsTrigger value="details">Detalles</TabsTrigger>
@@ -338,18 +338,34 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
                 <MessageSquare className="h-5 w-5 mt-1 text-gray-500" />
                 <div className="flex-1">
                   <div className="font-medium">
-                    {request.type === 'guest_request' ? 'Mensaje del huésped' : request.type}
+                    {request.type === 'maintenance' ?
+                      MAINTENANCE_REQUEST_TYPES[request.maintenanceType]?.label :
+                      (request.type === 'guest_request' ? 'Mensaje del huésped' : request.type)}
                   </div>
-                  {request.message && (
-                    <p className="text-sm text-gray-600 mt-1">{request.message}</p>
-                  )}
+                  <p className="text-sm text-gray-600 mt-1">
+                    {request.message || request.description}
+                  </p>
                   <div className="flex items-center mt-2 text-xs text-gray-500">
                     <Clock className="h-3 w-3 mr-1" />
-                    {formatDistanceToNow(request.createdAt, {
-                      addSuffix: true,
-                      locale: es
-                    })}
+                    {request.createdAt ? formatDistanceToNow(
+                      typeof request.createdAt === 'object' && 'toDate' in request.createdAt ?
+                        request.createdAt.toDate() :
+                        request.createdAt,
+                      { addSuffix: true, locale: es }
+                    ) : 'Fecha no disponible'}
                   </div>
+                  {request.type === 'maintenance' && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      <Badge variant={request.priority === 'high' ? 'destructive' : 'secondary'}>
+                        {request.priority}
+                      </Badge>
+                      {request.requiresBlocking && (
+                        <Badge variant="outline" className="ml-2">
+                          Bloqueo requerido
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <Button
                   size="sm"

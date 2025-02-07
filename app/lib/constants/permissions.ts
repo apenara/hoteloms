@@ -17,7 +17,20 @@ export const ROLE_PERMISSIONS = {
     canManageSettings: true,
     canGenerateQR: true,
     canViewReports: true,
-    canAccessOperationalPages: true
+    canAccessOperationalPages: true,
+    canChangeRoomStatus: true,
+    canViewAllRooms: true,
+    canApproveCleanings: true,
+    canCreateRequests: true,
+    canUpdateMaintenanceRequests: true,
+    canAssignTasks: true,
+    allowedStatuses: [
+      'available', 'occupied', 'checkout', 'in_house',
+      'need_cleaning', 'cleaning_occupied', 'cleaning_checkout', 
+      'cleaning_touch', 'ready_for_inspection', 'inspection',
+      'maintenance', 'do_not_disturb', 'clean_occupied'
+    ],
+    priorityLevels: ['low', 'normal', 'high', 'urgent']
   },
   supervisor: {
     canAccessDashboard: true,

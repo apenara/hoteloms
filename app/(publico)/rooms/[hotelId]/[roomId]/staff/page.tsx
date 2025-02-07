@@ -113,6 +113,68 @@ export default function StaffRoomView() {
     fetchData();
   }, [params?.hotelId, params?.roomId]);
 
+  const handleMaintenanceRequest = async (
+    type: keyof typeof MAINTENANCE_REQUEST_TYPES,
+    description: string
+  ) => {
+    if (!currentUser || !params?.hotelId || !params?.roomId || !room) return;
+  
+    try {
+      setProcesando(true);
+      const requestData = {
+        type: 'maintenance',
+        maintenanceType: type,
+        status: 'pending',
+        roomId: params.roomId,
+        roomNumber: room.number,
+        description: description.trim(),
+        createdAt: new Date(),
+        createdBy: {
+          id: currentUser.id,
+          name: currentUser.name,
+          role: currentUser.role
+        },
+        priority: MAINTENANCE_REQUEST_TYPES[type].priority,
+        location: `Habitación ${room.number}`,
+        source: 'staff'
+      };
+  
+      // Si requiere bloqueo, cambiar estado de la habitación
+      if (MAINTENANCE_REQUEST_TYPES[type].requiresBlocking) {
+        await registrarCambioEstado(
+          params.hotelId,
+          params.roomId,
+          currentUser.id,
+          'blocked_maintenance',
+          description.trim()
+        );
+      } else if (room.status === 'occupied') {
+        // Si está ocupada, marcar como ocupada con mantenimiento pendiente
+        await registrarCambioEstado(
+          params.hotelId,
+          params.roomId,
+          currentUser.id,
+          'occupied_maintenance',
+          description.trim()
+        );
+      }
+
+       // Crear la solicitud
+    const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
+    await addDoc(requestsRef, requestData);
+
+    setSuccessMessage('Solicitud de mantenimiento creada correctamente');
+    setNotes('');
+    await fetchData(); // Recargar datos
+
+  } catch (error) {
+    console.error('Error:', error);
+    setErrorMessage('Error al crear solicitud de mantenimiento');
+    setShowErrorDialog(true);
+  } finally {
+    setProcesando(false);
+  }
+};
 
   const handleStateChange = async (newState: string) => {
     if (!currentUser || !params?.hotelId || !params?.roomId || !room) {
@@ -120,17 +182,17 @@ export default function StaffRoomView() {
       setShowErrorDialog(true);
       return;
     }
-  
+
     // Solo requerir notas para mantenimiento
     if (newState === 'maintenance' && !notes.trim()) {
       setErrorMessage('Por favor, añade una nota describiendo el problema de mantenimiento');
       setShowErrorDialog(true);
       return;
     }
-  
+
     try {
       setProcesando(true);
-  
+
       // Registrar el cambio de estado
       await registrarCambioEstado(
         params.hotelId,
@@ -139,7 +201,7 @@ export default function StaffRoomView() {
         newState,
         notes.trim() || undefined
       );
-  
+
       // Solo crear solicitud si es mantenimiento
       if (newState === 'maintenance') {
         const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
@@ -161,17 +223,17 @@ export default function StaffRoomView() {
           source: 'staff'
         });
       }
-  
+
       setSuccessMessage('Estado actualizado correctamente');
       setNotes('');
       setRoom(prev => prev ? { ...prev, status: newState } : null);
-  
+
       // Recargar datos actualizados
       await Promise.all([
         fetchPendingRequests(),
         fetchHistoryEntries()
       ]);
-  
+
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
@@ -186,25 +248,28 @@ export default function StaffRoomView() {
   const getAvailableStates = () => {
     if (!currentUser || !room) return [];
     let states = [];
-  
+
     // Verificar permisos usando checkAccess
     if (checkAccess('canChangeRoomStatus')) {
       if (currentUser.role === 'housekeeper' || currentUser.role === 'hotel_admin') {
         switch (room.status) {
           case 'available':
           case 'occupied':
-          case 'clean_occupied': 
+          case 'clean_occupied':
             states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch', 'do_not_disturb'];
             break;
           case 'do_not_disturb':
             // Permitir volver a estados normales cuando el huésped lo permita
-            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch','do_not_disturb'];
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch', 'do_not_disturb'];
             break;
           case 'cleaning_occupied':
             states = ['clean_occupied'];
             break;
           case 'cleaning_checkout':
           case 'cleaning_touch':
+            states = ['ready_for_inspection'];
+            break;
+          case 'ready_for_inspection':
             states = ['inspection'];
             break;
           case 'inspection':
@@ -217,19 +282,24 @@ export default function StaffRoomView() {
             states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
         }
       }
-  
+
       if (currentUser.role === 'maintenance') {
-        if (room.status === 'maintenance') {
-          states = ['available'];
+        if (room.status === 'blocked_maintenance') {
+          states = ['available', 'need_cleaning'];
         }
+      }
+  
+      if (currentUser.role === 'hotel_admin') {
+        states = Object.keys(ROOM_STATES);
       }
     }
   
+
     // Mantenimiento siempre disponible para todo el personal
     if (!states.includes('maintenance')) {
       states.push('maintenance');
     }
-    
+
     return states;
   };
   if (!mounted || loading) {
@@ -290,7 +360,7 @@ export default function StaffRoomView() {
                       <RequestCard
                         key={request.id}
                         request={request}
-                        onComplete={() => {}} // Implementar si es necesario
+                        onComplete={() => { }} // Implementar si es necesario
                       />
                     ))}
                   </div>

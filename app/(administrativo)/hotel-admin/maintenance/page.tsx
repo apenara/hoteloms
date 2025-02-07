@@ -51,93 +51,42 @@ const [copiedStaffId, setCopiedStaffId] = useState<string | null>(null); // Aña
       const requestsRef = collection(db, "hotels", user.hotelId, "requests");
       const requestsQuery = query(
         requestsRef, 
-        where("category", "==", "maintenance"),
+        where("type", "==", "maintenance"),
         where("status", "==", "pending"),
         orderBy("createdAt", "desc")
       );
       const requestsSnap = await getDocs(requestsQuery);
       const requestsData = requestsSnap.docs.map(doc => ({
         id: doc.id,
-        isRequest: true, // Flag para identificar que es una solicitud
-        ...doc.data()
+        isRequest: true,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate()
       }));
       setPendingRequests(requestsData);
-
+  
       // 2. Obtener mantenimientos existentes
       const maintenanceRef = collection(db, "hotels", user.hotelId, "maintenance");
-      const maintenanceSnap = await getDocs(query(maintenanceRef, orderBy("createdAt", "desc")));
+      const maintenanceSnap = await getDocs(maintenanceRef);
       const maintenanceData = maintenanceSnap.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-
-      // Combinar solicitudes y mantenimientos
-      const combinedList = [...requestsData, ...maintenanceData];
-      setMaintenanceList(combinedList);
-
-      // 3. Obtener personal de mantenimiento
-      const staffRef = collection(db, "hotels", user.hotelId, "staff");
-      const staffQuery = query(staffRef, where("role", "==", "maintenance"));
-      const staffSnap = await getDocs(staffQuery);
-      
-      const staffData = await Promise.all(staffSnap.docs.map(async (doc) => {
-        const staffMember = { id: doc.id, ...doc.data() };
-        const staffTasks = maintenanceData.filter(m => m.assignedTo === doc.id);
-        
-        const completed = staffTasks.filter(t => t.status === 'completed');
-        const efficiency = staffTasks.length ? (completed.length / staffTasks.length) * 100 : 0;
-        
-        let totalTime = 0;
-        completed.forEach(task => {
-          if (task.completedAt && task.createdAt) {
-            totalTime += (task.completedAt.seconds - task.createdAt.seconds) / 3600;
-          }
-        });
-        const avgTime = completed.length ? totalTime / completed.length : 0;
-
-        return {
-          ...staffMember,
-          stats: {
-            completed: completed.length,
-            total: staffTasks.length,
-            efficiency,
-            avgTime
-          },
-          tasks: staffTasks
-        };
-      }));
-
-      setMaintenanceStaff(staffData);
+  
+      setMaintenanceList([...requestsData, ...maintenanceData]);
     } catch (error) {
-      console.error("Error al cargar datos:", error);
-      setError("Error al cargar la información de mantenimiento");
+      console.error("Error:", error);
+      setError("Error al cargar datos");
     } finally {
       setLoading(false);
     }
   };
-  const handleCopyAccessLink = (staffMember: any) => {
-    const baseUrl = window.location.origin;
-    const accessLink = `${baseUrl}/maintenance/${user?.hotelId}/staff`;
-    
-    navigator.clipboard.writeText(accessLink).then(() => {
-      setCopiedStaffId(staffMember.id);
-      toast({
-        title: "Enlace copiado",
-        description: "Enlace de acceso copiado al portapapeles",
-      });
-      
-      // Resetear el ícono después de 2 segundos
-      setTimeout(() => {
-        setCopiedStaffId(null);
-      }, 2000);
-    });
-  };
-  // Función para convertir una solicitud en mantenimiento
+  
+  // Modificar la función convertRequestToMaintenance
   const convertRequestToMaintenance = async (request, staffId, scheduledDate) => {
     try {
       const maintenanceRef = collection(db, "hotels", user.hotelId, "maintenance");
       
-      // Crear nuevo documento de mantenimiento
+      // Crear mantenimiento
       await addDoc(maintenanceRef, {
         roomId: request.roomId,
         roomNumber: request.roomNumber,
@@ -146,28 +95,32 @@ const [copiedStaffId, setCopiedStaffId] = useState<string | null>(null); // Aña
         priority: request.priority || "medium",
         status: "pending",
         assignedTo: staffId,
+        type: request.maintenanceType || "corrective",
+        requiresBlocking: request.requiresBlocking || false,
         scheduledFor: Timestamp.fromDate(new Date(scheduledDate)),
-        createdAt: request.createdAt,
-        source: "guest_request",
-        type: "corrective"
+        createdAt: request.createdAt || Timestamp.now(),
+        source: request.source || "staff_request"
       });
-
-      // Actualizar la solicitud original
+  
+      // Actualizar estado de la solicitud
       const requestRef = doc(db, "hotels", user.hotelId, "requests", request.id);
-      await deleteDoc(requestRef);
-
-      // Recargar datos
+      await updateDoc(requestRef, {
+        status: "in_progress",
+        assignedTo: staffId,
+        assignedAt: Timestamp.now()
+      });
+  
       await fetchMaintenanceData();
       
       toast({
-        title: "Solicitud convertida",
-        description: "La solicitud ha sido asignada correctamente",
+        title: "Solicitud asignada",
+        description: "Se ha creado el mantenimiento correctamente"
       });
     } catch (error) {
-      console.error("Error al convertir solicitud:", error);
+      console.error("Error:", error);
       toast({
         title: "Error",
-        description: "No se pudo convertir la solicitud",
+        description: "No se pudo asignar la solicitud",
         variant: "destructive"
       });
     }
@@ -242,10 +195,15 @@ const [copiedStaffId, setCopiedStaffId] = useState<string | null>(null); // Aña
 
         <TabsContent value="list">
           <MaintenanceList 
-            maintenanceList={maintenanceList.filter(m => 
-              m.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              m.description.toLowerCase().includes(searchTerm.toLowerCase())
-            )}
+            maintenanceList={maintenanceList.filter(m => {
+              const locationMatch = m.location ? 
+                m.location.toLowerCase().includes(searchTerm.toLowerCase()) : 
+                false;
+              const descriptionMatch = m.description ? 
+                m.description.toLowerCase().includes(searchTerm.toLowerCase()) : 
+                false;
+              return locationMatch || descriptionMatch;
+            })}
             maintenanceStaff={maintenanceStaff}
             onRefresh={fetchMaintenanceData}
             hotelId={user?.hotelId}
