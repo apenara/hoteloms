@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NotificationsDialog } from '@/components/dashboard/NotificationsDialog';
-import { ROOM_STATES, ROLE_PERMISSIONS } from '@/app/lib/constants/room-states';
+import { ROOM_STATES, ROLE_PERMISSIONS, MAINTENANCE_REQUEST_TYPES } from '@/app/lib/constants/room-states';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Search, Building, Clock, MessageSquare, LogOut } from 'lucide-react';
