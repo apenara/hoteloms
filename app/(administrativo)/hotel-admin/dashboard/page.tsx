@@ -74,7 +74,7 @@ export default function HotelDashboard() {
           }
         );
       } catch (error) {
-        console.error("Error al configurar listener:", error);
+        console.error("Error al configurar listenerr:", error);
         setError((error as any).message);
         setIsLoading(false);
       }
