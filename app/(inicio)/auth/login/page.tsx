@@ -1,25 +1,73 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase/config';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/config";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth";
 
 export default function LoginPage() {
-  const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const redirect = searchParams.get('redirect') || '/';
+  const { loginWithPin } = useAuth();
+  const redirect = searchParams.get("redirect") || "/";
+  const hotelId = searchParams.get("hotelId");
+  const requiredRole = searchParams.get("role");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // Si no hay hotelId pero estamos en la pestaña de PIN, buscar en todos los hoteles
+  const handlePinSearch = async (pin: string) => {
+    try {
+      // Buscar en todos los hoteles por el PIN
+      const hotelsRef = collection(db, "hotels");
+      const hotelsSnapshot = await getDocs(hotelsRef);
+
+      for (const hotelDoc of hotelsSnapshot.docs) {
+        const staffRef = collection(db, "hotels", hotelDoc.id, "staff");
+        const q = query(
+          staffRef,
+          where("pin", "==", pin),
+          where("status", "==", "active")
+        );
+        const staffSnapshot = await getDocs(q);
+
+        if (!staffSnapshot.empty) {
+          return hotelDoc.id;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error buscando PIN:", error);
+      return null;
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
@@ -29,80 +77,166 @@ export default function LoginPage() {
         loginData.password
       );
 
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
       const userData = userDoc.data();
 
       if (!userData) {
-        throw new Error('No se encontraron datos del usuario');
+        throw new Error("No se encontraron datos del usuario");
       }
 
       // Redireccionar según el rol
-      if (userData.role === 'super_admin') {
-        router.push('/admin/dashboard');
-      } else if (userData.role === 'hotel_admin') {
-        router.push('/hotel-admin/dashboard');
+      if (userData.role === "super_admin") {
+        window.location.href = "/admin/dashboard";
+      } else if (userData.role === "hotel_admin") {
+        window.location.href = "/hotel-admin/dashboard";
       } else {
-        router.push(redirect);
+        window.location.href = redirect;
       }
     } catch (error) {
-      console.error('Error de login:', error);
-      setError('Credenciales inválidas');
+      console.error("Error de login:", error);
+      setError("Credenciales inválidas");
     } finally {
       setLoading(false);
     }
   };
 
+  const handlePinLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      // Si no hay hotelId, intentar encontrar el hotel correcto
+      let targetHotelId = hotelId;
+      if (!targetHotelId) {
+        targetHotelId = await handlePinSearch(pin);
+        if (!targetHotelId) {
+          throw new Error("PIN no encontrado en ningún hotel");
+        }
+      }
+
+      const staffMember = await loginWithPin(pin, targetHotelId, requiredRole);
+
+      // Construir la URL de redirección según el rol
+      let redirectUrl = "";
+      switch (staffMember.role) {
+        case "reception":
+          redirectUrl = `/reception/${staffMember.hotelId}/staff`;
+          break;
+        case "maintenance":
+          redirectUrl = `/maintenance/${staffMember.hotelId}/staff`;
+          break;
+        case "hotel_admin":
+          redirectUrl = "/hotel-admin/dashboard";
+          break;
+        default:
+          redirectUrl = "/";
+      }
+
+      // Esperar un momento para asegurar que la sesión se guardó
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Usar window.location.href para forzar un refresh completo
+      window.location.href = redirectUrl;
+    } catch (error) {
+      console.error("Error de login con PIN:", error);
+      setError(error.message || "Error al iniciar sesión");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Determinar la pestaña por defecto
+  const defaultTab = hotelId ? "pin" : "email";
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Iniciar Sesión
-          </h2>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                required
-                placeholder="Correo electrónico"
-                value={loginData.email}
-                onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-              />
-            </div>
-            <div>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                placeholder="Contraseña"
-                value={loginData.password}
-                onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-              />
-            </div>
-          </div>
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl text-center">Iniciar Sesión</CardTitle>
+          <CardDescription className="text-center">
+            Ingresa con tu cuenta o PIN de personal
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue={defaultTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="pin">PIN de Personal</TabsTrigger>
+            </TabsList>
 
-          <div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </Button>
-          </div>
-        </form>
-      </div>
+            <TabsContent value="email">
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Correo Electrónico</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="correo@ejemplo.com"
+                    value={loginData.email}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, email: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={loginData.password}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, password: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="pin">
+              <form onSubmit={handlePinLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pin">PIN de Personal</Label>
+                  <Input
+                    id="pin"
+                    type="password"
+                    placeholder="Ingresa tu PIN"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
+                    maxLength={10}
+                    pattern="\d*"
+                    inputMode="numeric"
+                    required
+                    className="text-center tracking-widest text-lg"
+                  />
+                  <p className="text-sm text-gray-500 text-center">
+                    Ingresa tu número de documento como PIN
+                  </p>
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Verificando..." : "Acceder con PIN"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
