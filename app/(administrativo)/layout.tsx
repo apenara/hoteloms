@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/lib/auth';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/lib/auth";
 import {
   LayoutDashboard,
   Hotel,
@@ -16,11 +16,12 @@ import {
   Menu,
   LogOut,
   Bell,
-  X
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { NotificationsDialog } from '@/components/dashboard/NotificationsDialog';
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
+import { notificationService } from "../services/notificationService";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -40,53 +41,62 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
 
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  //modulo de mensajeria
+  useEffect(() => {
+    if (user) {
+      notificationService
+        .registerFCMToken(user.uid, user.hotelId, user.role)
+        .catch(console.error);
+    }
+  }, [user]);
 
   // Verificar autenticación
   useEffect(() => {
     if (!user && !staff) {
-      router.push('/auth/login');
+      router.push("/auth/login");
     }
   }, [user, staff, router]);
 
   const navigation = [
     {
-      name: 'Dashboard',
-      href: '/hotel-admin/dashboard',
-      icon: LayoutDashboard
+      name: "Dashboard",
+      href: "/hotel-admin/dashboard",
+      icon: LayoutDashboard,
     },
     {
-      name: 'Habitaciones',
-      href: '/hotel-admin/rooms',
-      icon: BedDouble
+      name: "Habitaciones",
+      href: "/hotel-admin/rooms",
+      icon: BedDouble,
     },
     {
-      name: 'Housekeeping',
-      href: '/hotel-admin/housekeeping',
-      icon: ClipboardList
+      name: "Housekeeping",
+      href: "/hotel-admin/housekeeping",
+      icon: ClipboardList,
     },
     {
-      name: 'Mantenimiento',
-      href: '/hotel-admin/maintenance',
-      icon: AlertTriangle
+      name: "Mantenimiento",
+      href: "/hotel-admin/maintenance",
+      icon: AlertTriangle,
     },
     {
-      name: 'Personal',
-      href: '/hotel-admin/staff',
-      icon: Users
+      name: "Personal",
+      href: "/hotel-admin/staff",
+      icon: Users,
     },
     {
-      name: 'Códigos QR',
-      href: '/hotel-admin/qr-manager',
-      icon: QrCode
+      name: "Códigos QR",
+      href: "/hotel-admin/qr-manager",
+      icon: QrCode,
     },
     {
-      name: 'Configuración',
-      href: '/hotel-admin/settings',
-      icon: Settings
-    }
+      name: "Configuración",
+      href: "/hotel-admin/settings",
+      icon: Settings,
+    },
   ];
 
   const closeSidebar = () => {
@@ -111,13 +121,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 z-40 h-screen w-64 transform bg-white shadow-lg transition-transform duration-200 ease-in-out ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo y botón cerrar en móviles */}
           <div className="flex h-16 items-center justify-between border-b px-4">
-            <Link href="/hotel-admin/dashboard" className="flex items-center space-x-2">
+            <Link
+              href="/hotel-admin/dashboard"
+              className="flex items-center space-x-2"
+            >
               <Hotel className="h-6 w-6" />
               <span className="text-xl font-bold">HotelOMS</span>
             </Link>
@@ -161,7 +174,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   <p className="text-sm font-medium text-gray-900">
                     {user?.name || staff?.name}
                   </p>
-                  <p className="text-xs text-gray-500">{user?.email || staff?.role}</p>
+                  <p className="text-xs text-gray-500">
+                    {user?.email || staff?.role}
+                  </p>
                 </div>
               </div>
               <Button
@@ -180,7 +195,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main Content */}
       <div
         className={`flex flex-col ${
-          isSidebarOpen ? 'lg:ml-64' : ''
+          isSidebarOpen ? "lg:ml-64" : ""
         } min-h-screen transition-all duration-200`}
       >
         {/* Header */}
