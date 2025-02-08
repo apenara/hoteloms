@@ -63,6 +63,6 @@ export default {
   },
   plugins: [
     require("tailwindcss-animate"),
-    require("tailwindcss-displaymodes"),
+    // require("tailwindcss-displaymodes"),
   ],
 } satisfies Config;
