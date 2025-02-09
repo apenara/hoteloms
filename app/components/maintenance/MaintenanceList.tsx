@@ -1,7 +1,6 @@
-// components/maintenance/MaintenanceList.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,24 +22,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Home, 
-  Clock, 
-  Calendar, 
+import {
+  Home,
+  Clock,
+  Calendar,
   AlertTriangle,
   CheckCircle2,
-  Wrench
-} from 'lucide-react';
-import { db } from '@/lib/firebase/config';
-import { doc, updateDoc, addDoc, collection, Timestamp } from 'firebase/firestore';
+  Wrench,
+} from "lucide-react";
+import { db } from "@/lib/firebase/config";
+import {
+  doc,
+  updateDoc,
+  addDoc,
+  collection,
+  Timestamp,
+} from "firebase/firestore";
 
 // Interfaces
 interface MaintenanceItem {
   id: string;
   location: string;
   description: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  priority: 'high' | 'medium' | 'low';
+  status: "pending" | "in_progress" | "completed";
+  priority: "high" | "medium" | "low";
   createdAt: any;
   scheduledFor?: any;
   assignedTo?: string;
@@ -67,53 +72,22 @@ const MaintenanceList = ({
   maintenanceList,
   maintenanceStaff,
   hotelId,
-  onRefresh
+  onRefresh,
 }: MaintenanceListProps) => {
-  const [selectedMaintenance, setSelectedMaintenance] = useState<MaintenanceItem | null>(null);
-  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [selectedMaintenance, setSelectedMaintenance] =
+    useState<MaintenanceItem | null>(null);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
-  const [completionNotes, setCompletionNotes] = useState('');
+  const [completionNotes, setCompletionNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [scheduledDate, setScheduledDate] = useState('');
+  const [error, setError] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
 
-  // Asignar personal a una tarea
-  const handleAssignStaff = async () => {
-    if (!selectedMaintenance || !selectedStaffId || !hotelId || !scheduledDate) return;
-    
-    setLoading(true);
-    try {
-      const maintenanceRef = doc(db, 'hotels', hotelId, 'maintenance', selectedMaintenance.id);
-      await updateDoc(maintenanceRef, {
-        assignedTo: selectedStaffId,
-        status: 'in_progress',
-        scheduledFor: Timestamp.fromDate(new Date(scheduledDate)),
-        lastUpdated: Timestamp.now()
-      });
-
-      // Registro en historial
-      const historyRef = collection(db, 'hotels', hotelId, 'maintenance_history');
-      await addDoc(historyRef, {
-        maintenanceId: selectedMaintenance.id,
-        action: 'assigned',
-        staffId: selectedStaffId,
-        timestamp: Timestamp.now(),
-        dueDate: Timestamp.fromDate(new Date(scheduledDate))
-      });
-
-      onRefresh();
-      setShowAssignDialog(false);
-      setSelectedMaintenance(null);
-      setSelectedStaffId('');
-      setScheduledDate('');
-    } catch (error) {
-      console.error('Error al asignar:', error);
-      setError('Error al asignar la tarea');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Ordenar la lista de mantenimientos por fecha de creación (más reciente primero)
+  const sortedMaintenanceList = maintenanceList.sort((a, b) => {
+    return b.createdAt.seconds - a.createdAt.seconds;
+  });
 
   // Completar una tarea
   const handleComplete = async () => {
@@ -122,48 +96,66 @@ const MaintenanceList = ({
     setLoading(true);
     try {
       const timestamp = Timestamp.now();
-      const maintenanceRef = doc(db, 'hotels', hotelId, 'maintenance', selectedMaintenance.id);
-      
+      const maintenanceRef = doc(
+        db,
+        "hotels",
+        hotelId,
+        "maintenance",
+        selectedMaintenance.id
+      );
+
       await updateDoc(maintenanceRef, {
-        status: 'completed',
+        status: "completed",
         completedAt: timestamp,
         completionNotes,
-        lastUpdated: timestamp
+        lastUpdated: timestamp,
       });
 
       // Si hay una habitación asociada, actualizarla
       if (selectedMaintenance.roomId) {
-        const roomRef = doc(db, 'hotels', hotelId, 'rooms', selectedMaintenance.roomId);
+        const roomRef = doc(
+          db,
+          "hotels",
+          hotelId,
+          "rooms",
+          selectedMaintenance.roomId
+        );
         await updateDoc(roomRef, {
-          status: 'available',
+          status: "available",
           currentMaintenance: null,
-          lastMaintenance: timestamp
+          lastMaintenance: timestamp,
         });
       }
 
       // Registro en historial
-      const historyRef = collection(db, 'hotels', hotelId, 'maintenance_history');
+      const historyRef = collection(
+        db,
+        "hotels",
+        hotelId,
+        "maintenance_history"
+      );
       await addDoc(historyRef, {
         maintenanceId: selectedMaintenance.id,
-        action: 'completed',
+        action: "completed",
         notes: completionNotes,
-        timestamp
+        timestamp,
       });
 
       onRefresh();
       setShowCompletionDialog(false);
       setSelectedMaintenance(null);
-      setCompletionNotes('');
+      setCompletionNotes("");
     } catch (error) {
-      console.error('Error al completar:', error);
-      setError('Error al completar la tarea');
+      console.error("Error al completar:", error);
+      setError("Error al completar la tarea");
     } finally {
       setLoading(false);
     }
   };
 
   const isOverdue = (maintenance: MaintenanceItem) => {
-    if (maintenance.status === 'completed' || !maintenance.scheduledFor) return false;
+    if (maintenance.status === "completed" || !maintenance.scheduledFor)
+      return false;
     const scheduledDate = new Date(maintenance.scheduledFor.seconds * 1000);
     return scheduledDate < new Date();
   };
@@ -171,23 +163,26 @@ const MaintenanceList = ({
   const getStatusBadge = (status: string, isOverdueTask: boolean) => {
     const statusConfig = {
       pending: {
-        color: isOverdueTask ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800',
-        label: isOverdueTask ? 'Vencido' : 'Pendiente',
-        icon: isOverdueTask ? AlertTriangle : Clock
+        color: isOverdueTask
+          ? "bg-red-100 text-red-800"
+          : "bg-yellow-100 text-yellow-800",
+        label: isOverdueTask ? "Vencido" : "Pendiente",
+        icon: isOverdueTask ? AlertTriangle : Clock,
       },
       in_progress: {
-        color: 'bg-blue-100 text-blue-800',
-        label: 'En Progreso',
-        icon: Wrench
+        color: "bg-blue-100 text-blue-800",
+        label: "En Progreso",
+        icon: Wrench,
       },
       completed: {
-        color: 'bg-green-100 text-green-800',
-        label: 'Completado',
-        icon: CheckCircle2
-      }
+        color: "bg-green-100 text-green-800",
+        label: "Completado",
+        icon: CheckCircle2,
+      },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const config =
+      statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     const Icon = config.icon;
 
     return (
@@ -203,21 +198,22 @@ const MaintenanceList = ({
   const getPriorityBadge = (priority: string) => {
     const config = {
       high: {
-        color: 'bg-red-100 text-red-800',
-        label: 'Alta'
+        color: "bg-red-100 text-red-800",
+        label: "Alta",
       },
       medium: {
-        color: 'bg-yellow-100 text-yellow-800',
-        label: 'Media'
+        color: "bg-yellow-100 text-yellow-800",
+        label: "Media",
       },
       low: {
-        color: 'bg-green-100 text-green-800',
-        label: 'Baja'
-      }
+        color: "bg-green-100 text-green-800",
+        label: "Baja",
+      },
     };
 
-    const priorityConfig = config[priority as keyof typeof config] || config.medium;
-    
+    const priorityConfig =
+      config[priority as keyof typeof config] || config.medium;
+
     return (
       <Badge className={priorityConfig.color}>
         Prioridad: {priorityConfig.label}
@@ -227,7 +223,7 @@ const MaintenanceList = ({
 
   return (
     <div className="space-y-4">
-      {maintenanceList.map((maintenance) => (
+      {sortedMaintenanceList.map((maintenance) => (
         <Card key={maintenance.id}>
           <CardContent className="p-4">
             <div className="flex justify-between items-start">
@@ -239,23 +235,34 @@ const MaintenanceList = ({
                   {getStatusBadge(maintenance.status, isOverdue(maintenance))}
                 </div>
 
-                <p className="text-sm text-gray-600">{maintenance.description}</p>
+                <p className="text-sm text-gray-600">
+                  {maintenance.description}
+                </p>
 
                 <div className="flex items-center gap-4 text-sm text-gray-500">
                   <span className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    Creado: {new Date(maintenance.createdAt.seconds * 1000).toLocaleString()}
+                    Creado:{" "}
+                    {new Date(
+                      maintenance.createdAt.seconds * 1000
+                    ).toLocaleString()}
                   </span>
                   {maintenance.scheduledFor && (
                     <span className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      Programado: {new Date(maintenance.scheduledFor.seconds * 1000).toLocaleString()}
+                      Programado:{" "}
+                      {new Date(
+                        maintenance.scheduledFor.seconds * 1000
+                      ).toLocaleString()}
                     </span>
                   )}
                   {maintenance.assignedTo && (
                     <span>
-                      Asignado a: {
-                        maintenanceStaff.find(s => s.id === maintenance.assignedTo)?.name
+                      Asignado a:{" "}
+                      {
+                        maintenanceStaff.find(
+                          (s) => s.id === maintenance.assignedTo
+                        )?.name
                       }
                     </span>
                   )}
@@ -263,29 +270,23 @@ const MaintenanceList = ({
               </div>
 
               <div className="flex gap-2">
-                {!maintenance.assignedTo && maintenance.status !== 'completed' && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedMaintenance(maintenance);
-                      setShowAssignDialog(true);
-                    }}
-                  >
-                    Asignar
-                  </Button>
-                )}
+                {!maintenance.assignedTo &&
+                  maintenance.status !== "completed" && (
+                    <span className="text-gray-500">Sin asignar</span>
+                  )}
 
-                {maintenance.status !== 'completed' && maintenance.assignedTo && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedMaintenance(maintenance);
-                      setShowCompletionDialog(true);
-                    }}
-                  >
-                    Completar
-                  </Button>
-                )}
+                {maintenance.status !== "completed" &&
+                  maintenance.assignedTo && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedMaintenance(maintenance);
+                        setShowCompletionDialog(true);
+                      }}
+                    >
+                      Completar
+                    </Button>
+                  )}
               </div>
             </div>
           </CardContent>
@@ -298,11 +299,11 @@ const MaintenanceList = ({
           <DialogHeader>
             <DialogTitle>Asignar Mantenimiento</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Personal de Mantenimiento</Label>
-              <Select 
+              <Select
                 value={selectedStaffId}
                 onValueChange={setSelectedStaffId}
               >
@@ -325,7 +326,7 @@ const MaintenanceList = ({
                 type="date"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={new Date().toISOString().split("T")[0]}
               />
             </div>
           </div>
@@ -344,23 +345,26 @@ const MaintenanceList = ({
             >
               Cancelar
             </Button>
-            <Button
+            {/* <Button
               onClick={handleAssignStaff}
               disabled={loading || !selectedStaffId || !scheduledDate}
             >
-              {loading ? 'Asignando...' : 'Asignar'}
-            </Button>
+              {loading ? "Asignando..." : "Asignar"}
+            </Button> */}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Diálogo de Completar */}
-      <Dialog open={showCompletionDialog} onOpenChange={setShowCompletionDialog}>
+      <Dialog
+        open={showCompletionDialog}
+        onOpenChange={setShowCompletionDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Completar Mantenimiento</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Notas de Finalización</Label>
@@ -391,7 +395,7 @@ const MaintenanceList = ({
               onClick={handleComplete}
               disabled={loading || !completionNotes.trim()}
             >
-              {loading ? 'Guardando...' : 'Completar'}
+              {loading ? "Guardando..." : "Completar"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from "react";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,17 +22,39 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from "lucide-react";
 
-const MaintenanceRequestCard = ({ request, staff, onAssign }) => {
+const MaintenanceRequestCard = ({ request, hotelId, onAssign, staff }) => {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [maintenanceStaff, setMaintenanceStaff] = useState([]);
+
+  useEffect(() => {
+    const fetchMaintenanceStaff = async () => {
+      if (!hotelId) return;
+
+      try {
+        const staffRef = collection(db, "hotels", hotelId, "staff");
+        const staffQuery = query(staffRef, where("role", "==", "maintenance"));
+        const staffSnap = await getDocs(staffQuery);
+        const staffData = staffSnap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setMaintenanceStaff(staffData);
+      } catch (error) {
+        console.error("Error al cargar personal de mantenimiento:", error);
+      }
+    };
+
+    fetchMaintenanceStaff();
+  }, [hotelId]);
 
   const handleAssign = async () => {
     if (!selectedStaff || !scheduledDate) return;
-    
+
     setLoading(true);
     try {
       await onAssign(request, selectedStaff, scheduledDate);
@@ -57,20 +81,16 @@ const MaintenanceRequestCard = ({ request, staff, onAssign }) => {
                   Nueva Solicitud
                 </Badge>
               </div>
-              
-              <p className="text-sm text-gray-600">
-                {request.description}
-              </p>
-              
+
+              <p className="text-sm text-gray-600">{request.description}</p>
+
               <div className="text-xs text-gray-500">
-                Solicitado: {new Date(request.createdAt.seconds * 1000).toLocaleString()}
+                Solicitado:{" "}
+                {new Date(request.createdAt.seconds * 1000).toLocaleString()}
               </div>
             </div>
-            
-            <Button
-              size="sm"
-              onClick={() => setShowAssignDialog(true)}
-            >
+
+            <Button size="sm" onClick={() => setShowAssignDialog(true)}>
               Asignar
             </Button>
           </div>
@@ -82,19 +102,16 @@ const MaintenanceRequestCard = ({ request, staff, onAssign }) => {
           <DialogHeader>
             <DialogTitle>Asignar Mantenimiento</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Personal de Mantenimiento</Label>
-              <Select 
-                value={selectedStaff}
-                onValueChange={setSelectedStaff}
-              >
+              <Select value={selectedStaff} onValueChange={setSelectedStaff}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar personal" />
                 </SelectTrigger>
                 <SelectContent>
-                  {staff.map((member) => (
+                  {maintenanceStaff.map((member) => (
                     <SelectItem key={member.id} value={member.id}>
                       {member.name}
                     </SelectItem>
@@ -109,7 +126,7 @@ const MaintenanceRequestCard = ({ request, staff, onAssign }) => {
                 type="date"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={new Date().toISOString().split("T")[0]}
               />
             </div>
           </div>
@@ -126,7 +143,7 @@ const MaintenanceRequestCard = ({ request, staff, onAssign }) => {
               onClick={handleAssign}
               disabled={loading || !selectedStaff || !scheduledDate}
             >
-              {loading ? 'Asignando...' : 'Asignar'}
+              {loading ? "Asignando..." : "Asignar"}
             </Button>
           </DialogFooter>
         </DialogContent>
