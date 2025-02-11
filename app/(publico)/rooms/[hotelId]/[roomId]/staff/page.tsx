@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -23,6 +23,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import type { Room } from '@/app/lib/types';
 import { ROOM_STATES } from '@/app/lib/constants/room-states';
 import { registrarCambioEstado } from '@/app/services/housekeeping';
+import MaintenanceDialog from '@/components/maintenance/MaintenanceDialog';
+import { uploadMaintenanceImages } from '@/app/services/storage';
 
 export default function StaffRoomView() {
   const params = useParams();
@@ -33,7 +35,7 @@ export default function StaffRoomView() {
   const [hotel, setHotel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [notes, setNotes] = useState('');
+  // const [notes, setNotes] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingRequests, setPendingRequests] = useState([]);
   const [historyEntries, setHistoryEntries] = useState([]);
@@ -41,6 +43,7 @@ export default function StaffRoomView() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [procesando, setProcesando] = useState(false);
+  const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
 
   const fetchData = async () => {
     if (!params?.hotelId || !params?.roomId) return;
@@ -113,69 +116,74 @@ export default function StaffRoomView() {
     fetchData();
   }, [params?.hotelId, params?.roomId]);
 
-  const handleMaintenanceRequest = async (
-    type: keyof typeof MAINTENANCE_REQUEST_TYPES,
-    description: string
-  ) => {
+  const handleMaintenanceRequest = async ({
+    description,
+    priority,
+    images
+  }: {
+    description: string;
+    priority: string;
+    images: File[];
+  }) => {
     if (!currentUser || !params?.hotelId || !params?.roomId || !room) return;
-  
+
     try {
       setProcesando(true);
-      const requestData = {
+
+      // 1. Crear la solicitud primero para obtener el ID
+      const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
+      const requestDoc = await addDoc(requestsRef, {
         type: 'maintenance',
-        maintenanceType: type,
         status: 'pending',
         roomId: params.roomId,
         roomNumber: room.number,
-        description: description.trim(),
+        description: description,
         createdAt: new Date(),
         createdBy: {
           id: currentUser.id,
           name: currentUser.name,
           role: currentUser.role
         },
-        priority: MAINTENANCE_REQUEST_TYPES[type].priority,
+        priority,
         location: `Habitación ${room.number}`,
         source: 'staff'
-      };
-  
-      // Si requiere bloqueo, cambiar estado de la habitación
-      if (MAINTENANCE_REQUEST_TYPES[type].requiresBlocking) {
-        await registrarCambioEstado(
+      });
+
+      // 2. Si hay imágenes, subirlas
+      if (images.length > 0) {
+        const imageUrls = await uploadMaintenanceImages(
           params.hotelId,
           params.roomId,
-          currentUser.id,
-          'blocked_maintenance',
-          description.trim()
+          requestDoc.id,
+          images
         );
-      } else if (room.status === 'occupied') {
-        // Si está ocupada, marcar como ocupada con mantenimiento pendiente
-        await registrarCambioEstado(
-          params.hotelId,
-          params.roomId,
-          currentUser.id,
-          'occupied_maintenance',
-          description.trim()
-        );
+
+        // 3. Actualizar la solicitud con las URLs de las imágenes
+        await updateDoc(requestDoc, {
+          images: imageUrls
+        });
       }
 
-       // Crear la solicitud
-    const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
-    await addDoc(requestsRef, requestData);
+      // 4. Cambiar el estado de la habitación si es necesario
+      await registrarCambioEstado(
+        params.hotelId,
+        params.roomId,
+        currentUser.id,
+        'maintenance',
+        description
+      );
 
-    setSuccessMessage('Solicitud de mantenimiento creada correctamente');
-    setNotes('');
-    await fetchData(); // Recargar datos
+      setSuccessMessage('Solicitud de mantenimiento creada correctamente');
+      await fetchData(); // Recargar datos
 
-  } catch (error) {
-    console.error('Error:', error);
-    setErrorMessage('Error al crear solicitud de mantenimiento');
-    setShowErrorDialog(true);
-  } finally {
-    setProcesando(false);
-  }
-};
-
+    } catch (error) {
+      console.error('Error:', error);
+      setErrorMessage('Error al crear solicitud de mantenimiento');
+      setShowErrorDialog(true);
+    } finally {
+      setProcesando(false);
+    }
+  };
   const handleStateChange = async (newState: string) => {
     if (!currentUser || !params?.hotelId || !params?.roomId || !room) {
       setErrorMessage('Error: Faltan datos necesarios');
@@ -183,12 +191,12 @@ export default function StaffRoomView() {
       return;
     }
 
-    // Solo requerir notas para mantenimiento
-    if (newState === 'maintenance' && !notes.trim()) {
-      setErrorMessage('Por favor, añade una nota describiendo el problema de mantenimiento');
-      setShowErrorDialog(true);
-      return;
-    }
+    // // Solo requerir notas para mantenimiento
+    // if (newState === 'maintenance' && !notes.trim()) {
+    //   setErrorMessage('Por favor, añade una nota describiendo el problema de mantenimiento');
+    //   setShowErrorDialog(true);
+    //   return;
+    // }
 
     try {
       setProcesando(true);
@@ -198,8 +206,8 @@ export default function StaffRoomView() {
         params.hotelId,
         params.roomId,
         currentUser.id,
-        newState,
-        notes.trim() || undefined
+        newState
+        // notes.trim() || undefined
       );
 
       // Solo crear solicitud si es mantenimiento
@@ -225,7 +233,7 @@ export default function StaffRoomView() {
       }
 
       setSuccessMessage('Estado actualizado correctamente');
-      setNotes('');
+      // setNotes('');
       setRoom(prev => prev ? { ...prev, status: newState } : null);
 
       // Recargar datos actualizados
@@ -288,12 +296,12 @@ export default function StaffRoomView() {
           states = ['available', 'need_cleaning'];
         }
       }
-  
+
       if (currentUser.role === 'hotel_admin') {
         states = Object.keys(ROOM_STATES);
       }
     }
-  
+
 
     // Mantenimiento siempre disponible para todo el personal
     if (!states.includes('maintenance')) {
@@ -381,7 +389,18 @@ export default function StaffRoomView() {
                   {getAvailableStates().map(state => {
                     const stateInfo = ROOM_STATES[state];
                     const StateIcon = stateInfo?.icon || CheckCircle;
-                    return (
+                    return state === 'maintenance' ? (
+                      <Button
+                        key={state}
+                        variant="outline"
+                        className={`flex flex-col items-center p-4 h-auto ${stateInfo?.color || ''}`}
+                        onClick={() => setShowMaintenanceDialog(true)}
+                        disabled={procesando}
+                      >
+                        <StateIcon className="h-5 w-5" />
+                        <span className="mt-2 text-sm font-medium">{stateInfo?.label}</span>
+                      </Button>
+                    ) : (
                       <Button
                         key={state}
                         variant="outline"
@@ -401,7 +420,7 @@ export default function StaffRoomView() {
                   })}
                 </div>
 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <label className="font-medium">
                     Notas {room?.status === 'maintenance' ? '(requerido)' : '(opcional)'}:
                   </label>
@@ -416,7 +435,7 @@ export default function StaffRoomView() {
                     className="min-h-[100px]"
                     disabled={procesando}
                   />
-                </div>
+                </div> */}
               </div>
             </TabsContent>
 
@@ -474,6 +493,12 @@ export default function StaffRoomView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <MaintenanceDialog
+        isOpen={showMaintenanceDialog}
+        onClose={() => setShowMaintenanceDialog(false)}
+        onSubmit={handleMaintenanceRequest}
+        loading={procesando}
+      />
     </div>
   );
 }

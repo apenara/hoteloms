@@ -8,6 +8,8 @@ import {
   where,
   getDocs,
   Timestamp,
+  updateDoc,
+  doc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import {
@@ -36,6 +38,8 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "../ui/badge";
+import ImageUpload from './ImageUpload';
+import { uploadMaintenanceImages } from "@/app/services/storage";
 
 interface MaintenanceFormDialogProps {
   hotelId: string;
@@ -70,6 +74,7 @@ const MaintenanceFormDialog = ({
 }: MaintenanceFormDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [maintenanceStaff, setMaintenanceStaff] = useState<Staff[]>([]);
   const [formData, setFormData] = useState({
@@ -152,13 +157,41 @@ const MaintenanceFormDialog = ({
           ? `Habitación ${selectedRoom?.number}`
           : formData.location;
 
-      await addDoc(maintenanceRef, {
+      // 1. Crear el documento base de mantenimiento
+      const maintenanceData = {
         ...formData,
         location,
         status: "pending",
         createdAt: Timestamp.now(),
         scheduledFor: Timestamp.fromDate(new Date(formData.scheduledFor)),
-      });
+      };
+
+      // 2. Guardar el documento y obtener la referencia
+      const newMaintenanceDoc = await addDoc(maintenanceRef, maintenanceData);
+
+      // 3. Si hay imágenes, subirlas y actualizar el documento
+      if (selectedImages && selectedImages.length > 0) {
+        try {
+          console.log('Subiendo imágenes...', selectedImages);
+          const imageUrls = await uploadMaintenanceImages(
+            hotelId,
+            newMaintenanceDoc.id,
+            selectedImages
+          );
+
+          console.log('URLs obtenidas:', imageUrls);
+
+          // 4. Actualizar el documento con las URLs de las imágenes
+          if (imageUrls && imageUrls.length > 0) {
+            await updateDoc(doc(db, "hotels", hotelId, "maintenance", newMaintenanceDoc.id), {
+              images: imageUrls
+            });
+          }
+        } catch (imageError) {
+          console.error("Error al subir imágenes:", imageError);
+          // Aún si falla la subida de imágenes, el mantenimiento se creó
+        }
+      }
 
       onSuccess?.();
       onClose();
@@ -168,7 +201,6 @@ const MaintenanceFormDialog = ({
       setLoading(false);
     }
   };
-
   const handleChange = (field: string) => (e: any) => {
     const value = e?.target?.value ?? e;
     setFormData((prev) => ({
@@ -318,8 +350,8 @@ const MaintenanceFormDialog = ({
                               <span>
                                 {selectedRoom.lastCleaned
                                   ? new Date(
-                                      selectedRoom.lastCleaned.seconds * 1000
-                                    ).toLocaleDateString("es-CO")
+                                    selectedRoom.lastCleaned.seconds * 1000
+                                  ).toLocaleDateString("es-CO")
                                   : "No registrada"}
                               </span>
                             </div>
@@ -328,9 +360,9 @@ const MaintenanceFormDialog = ({
                               <span>
                                 {selectedRoom.lastMaintenance
                                   ? new Date(
-                                      selectedRoom.lastMaintenance.seconds *
-                                        1000
-                                    ).toLocaleDateString("es-CO")
+                                    selectedRoom.lastMaintenance.seconds *
+                                    1000
+                                  ).toLocaleDateString("es-CO")
                                   : "No registrado"}
                               </span>
                             </div>
@@ -395,6 +427,18 @@ const MaintenanceFormDialog = ({
               required
               className="min-h-[100px]"
             />
+          </div>
+
+          {/* Agregar el componente de carga de imágenes */}
+          <div className="space-y-2">
+            <Label>Imágenes</Label>
+            <ImageUpload
+              onImagesSelected={setSelectedImages}
+              maxImages={3}
+            />
+            <p className="text-xs text-gray-500">
+              Puedes subir hasta 3 imágenes (JPG, PNG o WebP, máx. 5MB cada una)
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

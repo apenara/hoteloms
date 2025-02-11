@@ -101,20 +101,11 @@ const MaintenancePage = () => {
   };
 
   // Modificar la función convertRequestToMaintenance
-  const convertRequestToMaintenance = async (
-    request,
-    staffId,
-    scheduledDate
-  ) => {
+  const convertRequestToMaintenance = async (request, staffId, scheduledDate) => {
     try {
-      const maintenanceRef = collection(
-        db,
-        "hotels",
-        user.hotelId,
-        "maintenance"
-      );
-
-      // Crear mantenimiento
+      const maintenanceRef = collection(db, "hotels", user.hotelId, "maintenance");
+  
+      // Crear mantenimiento incluyendo las imágenes
       await addDoc(maintenanceRef, {
         roomId: request.roomId,
         roomNumber: request.roomNumber,
@@ -128,24 +119,20 @@ const MaintenancePage = () => {
         scheduledFor: Timestamp.fromDate(new Date(scheduledDate)),
         createdAt: request.createdAt || Timestamp.now(),
         source: request.source || "staff_request",
+        // Incluir las imágenes si existen
+        images: request.images || [],
       });
-
+  
       // Actualizar estado de la solicitud
-      const requestRef = doc(
-        db,
-        "hotels",
-        user.hotelId,
-        "requests",
-        request.id
-      );
+      const requestRef = doc(db, "hotels", user.hotelId, "requests", request.id);
       await updateDoc(requestRef, {
         status: "in_progress",
         assignedTo: staffId,
         assignedAt: Timestamp.now(),
       });
-
+  
       await fetchMaintenanceData();
-
+  
       toast({
         title: "Solicitud asignada",
         description: "Se ha creado el mantenimiento correctamente",

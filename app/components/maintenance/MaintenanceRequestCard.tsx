@@ -1,154 +1,178 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import React, { useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { 
+  AlertTriangle,
+  Clock,
+  Calendar,
+  User,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { AlertTriangle } from "lucide-react";
+} from '@/components/ui/select';
+import ImageGallery from './ImageGallery';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
-const MaintenanceRequestCard = ({ request, hotelId, onAssign, staff }) => {
-  const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState("");
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [maintenanceStaff, setMaintenanceStaff] = useState([]);
+interface MaintenanceRequestCardProps {
+  request: any;
+  staff: any[];
+  hotelId: string;
+  onAssign: (request: any, staffId: string, scheduledDate: Date) => Promise<void>;
+}
 
-  useEffect(() => {
-    const fetchMaintenanceStaff = async () => {
-      if (!hotelId) return;
-
-      try {
-        const staffRef = collection(db, "hotels", hotelId, "staff");
-        const staffQuery = query(staffRef, where("role", "==", "maintenance"));
-        const staffSnap = await getDocs(staffQuery);
-        const staffData = staffSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setMaintenanceStaff(staffData);
-      } catch (error) {
-        console.error("Error al cargar personal de mantenimiento:", error);
-      }
-    };
-
-    fetchMaintenanceStaff();
-  }, [hotelId]);
+const MaintenanceRequestCard = ({
+  request,
+  staff,
+  hotelId,
+  onAssign
+}: MaintenanceRequestCardProps) => {
+  const [selectedStaff, setSelectedStaff] = useState('');
+  const [scheduledDate, setScheduledDate] = useState<Date>(new Date());
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const handleAssign = async () => {
     if (!selectedStaff || !scheduledDate) return;
-
-    setLoading(true);
+    
+    setIsAssigning(true);
     try {
       await onAssign(request, selectedStaff, scheduledDate);
-      setShowAssignDialog(false);
-    } catch (error) {
-      console.error("Error al asignar:", error);
     } finally {
-      setLoading(false);
+      setIsAssigning(false);
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   return (
-    <>
-      <Card className="bg-yellow-50">
-        <CardContent className="p-4">
-          <div className="flex justify-between items-start">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                <span className="font-medium">
-                  {request.location || `Habitación ${request.roomNumber}`}
-                </span>
-                <Badge className="bg-yellow-100 text-yellow-800">
-                  Nueva Solicitud
-                </Badge>
+    <Card className="p-4">
+      <div className="space-y-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h4 className="text-lg font-medium flex items-center gap-2">
+              {request.location || `Habitación ${request.roomNumber}`}
+              <Badge className={getPriorityColor(request.priority)}>
+                {request.priority === 'high' ? 'Alta' : 
+                 request.priority === 'medium' ? 'Media' : 'Baja'}
+              </Badge>
+            </h4>
+            <p className="text-sm text-gray-500 mt-1">
+              {format(request.createdAt, "d 'de' MMMM 'a las' HH:mm", { locale: es })}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+
+        <p className="text-gray-600">{request.description}</p>
+
+        {request.images?.length > 0 && (
+          <div className="mt-4">
+            <ImageGallery images={request.images} thumbnailSize="medium" />
+          </div>
+        )}
+
+        {showDetails && (
+          <div className="space-y-4 pt-4 border-t">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Personal Asignado
+                </label>
+                <Select
+                  value={selectedStaff}
+                  onValueChange={setSelectedStaff}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar personal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staff.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <p className="text-sm text-gray-600">{request.description}</p>
-
-              <div className="text-xs text-gray-500">
-                Solicitado:{" "}
-                {new Date(request.createdAt.seconds * 1000).toLocaleString()}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Fecha Programada
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      {format(scheduledDate, "d 'de' MMMM, yyyy", { locale: es })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={scheduledDate}
+                      onSelect={(date) => date && setScheduledDate(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
-            <Button size="sm" onClick={() => setShowAssignDialog(true)}>
-              Asignar
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Asignar Mantenimiento</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Personal de Mantenimiento</Label>
-              <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar personal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {maintenanceStaff.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Fecha Programada</Label>
-              <Input
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
-              />
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={handleAssign}
+                disabled={!selectedStaff || isAssigning}
+                className="w-full sm:w-auto"
+              >
+                {isAssigning ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Asignando...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    Asignar Mantenimiento
+                  </>
+                )}
+              </Button>
             </div>
           </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowAssignDialog(false)}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleAssign}
-              disabled={loading || !selectedStaff || !scheduledDate}
-            >
-              {loading ? "Asignando..." : "Asignar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        )}
+      </div>
+    </Card>
   );
 };
 
