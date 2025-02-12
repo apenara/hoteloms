@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { db } from '@/lib/firebase/config';
@@ -10,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import ImageUpload from '@/components/maintenance/ImageUpload';
 import {
     Clock,
     CheckCircle,
@@ -18,9 +17,6 @@ import {
     Home,
     Loader2
 } from 'lucide-react';
-import ImageViewer from './ImageViewer';
-import ImageUpload from './ImageUpload';
-import { toast } from '@/app/hooks/use-toast';
 import { uploadMaintenanceImages } from '@/app/services/storage';
 
 const MaintenanceStaffView = ({ hotelId }) => {
@@ -31,7 +27,8 @@ const MaintenanceStaffView = ({ hotelId }) => {
     const [showDialog, setShowDialog] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [completionImages, setCompletionImages] = useState<File[]>([]);
+    const [selectedImages, setSelectedImages] = useState<File[]>([]);
+    const [isUploadingImages, setIsUploadingImages] = useState(false);
 
     useEffect(() => {
         if (!hotelId || !staff?.id) return;
@@ -74,36 +71,41 @@ const MaintenanceStaffView = ({ hotelId }) => {
 
     const handleCompleteWork = async () => {
         if (!selectedRequest || !completionNotes.trim()) return;
-    
+
         setLoading(true);
+        setIsUploadingImages(true);
         try {
             const timestamp = Timestamp.now();
-    
-            // 1. Subir imágenes si existen
-            let completionImageUrls: string[] = [];
-            if (completionImages.length > 0) {
-                completionImageUrls = await uploadMaintenanceImages(
-                    hotelId,
-                    selectedRequest.id,
-                    completionImages
-                );
+            
+            // Subir imágenes si hay alguna seleccionada
+            let imageUrls: string[] = [];
+            if (selectedImages.length > 0) {
+                try {
+                    imageUrls = await uploadMaintenanceImages(
+                        hotelId,
+                        selectedRequest.id,
+                        selectedImages
+                    );
+                } catch (error) {
+                    console.error('Error subiendo imágenes:', error);
+                    setError('Error al subir las imágenes');
+                    return;
+                }
             }
-    
-            // 2. Actualizar el mantenimiento
+
             const requestRef = doc(db, 'hotels', hotelId, 'maintenance', selectedRequest.id);
             await updateDoc(requestRef, {
                 status: 'completed',
                 completedAt: timestamp,
                 completionNotes,
-                completionImages: completionImageUrls, // Agregar URLs de las imágenes
+                completionImages: imageUrls, // Agregar URLs de las imágenes
                 completedBy: {
                     id: staff.id,
                     name: staff.name,
                     timestamp
                 }
             });
-    
-            // 3. Registrar en el historial
+
             const historyRef = collection(db, 'hotels', hotelId, 'rooms', selectedRequest.roomId, 'history');
             await addDoc(historyRef, {
                 type: 'maintenance_completed',
@@ -111,31 +113,20 @@ const MaintenanceStaffView = ({ hotelId }) => {
                 staffId: staff.id,
                 staffName: staff.name,
                 notes: completionNotes,
-                maintenanceId: selectedRequest.id,
-                completionImages: completionImageUrls // Incluir imágenes en el historial
+                images: imageUrls, // Agregar URLs de las imágenes
+                maintenanceId: selectedRequest.id
             });
-    
-            // 4. Limpiar el formulario y cerrar el diálogo
+
             setShowDialog(false);
             setCompletionNotes('');
-            setCompletionImages([]);
+            setSelectedImages([]);
             setSelectedRequest(null);
-    
-            toast({
-                title: "Trabajo completado",
-                description: "El mantenimiento se ha registrado como completado correctamente."
-            });
-    
         } catch (error) {
             console.error('Error:', error);
             setError('Error al completar el trabajo');
-            toast({
-                title: "Error",
-                description: "No se pudo completar el registro del trabajo",
-                variant: "destructive"
-            });
         } finally {
             setLoading(false);
+            setIsUploadingImages(false);
         }
     };
 
@@ -198,80 +189,74 @@ const MaintenanceStaffView = ({ hotelId }) => {
                     )}
 
                     <div className="space-y-4">
-                        {requests.map((request) => (
-                            <div
-                                key={request.id}
-                                className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Home className="h-4 w-4 text-gray-500" />
-                                            <h3 className="font-medium">
-                                                {request.location || request.room?.number}
-                                            </h3>
-                                            <Badge className={`ml-2 ${getPriorityColor(request.priority)}`}>
-                                                Prioridad: {getPriorityLabel(request.priority)}
-                                            </Badge>
-                                            {request.status === 'in_progress' && (
-                                                <Badge className="bg-blue-100 text-blue-800">
-                                                    En Progreso
+                        {requests.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                No hay solicitudes pendientes
+                            </div>
+                        ) : (
+                            requests.map((request) => (
+                                <div
+                                    key={request.id}
+                                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <Home className="h-4 w-4 text-gray-500" />
+                                                <h3 className="font-medium">
+                                                    {request.location || `Habitación ${request.roomNumber}`}
+                                                </h3>
+                                                <Badge className={`ml-2 ${getPriorityColor(request.priority)}`}>
+                                                    Prioridad: {getPriorityLabel(request.priority)}
                                                 </Badge>
-                                            )}
-                                        </div>
-                                        <p className="text-sm text-gray-600">{request.description}</p>
-
-                                        {/* Sección de imágenes */}
-                                        {request.images?.length > 0 && (
-                                            <div className="mt-4">
-                                                <h4 className="text-sm font-medium mb-2">
-                                                    Imágenes ({request.images.length})
-                                                </h4>
-                                                <ImageViewer urls={request.images} />
+                                                {request.status === 'in_progress' && (
+                                                    <Badge className="bg-blue-100 text-blue-800">
+                                                        En Progreso
+                                                    </Badge>
+                                                )}
                                             </div>
-                                        )}
-
-                                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="h-4 w-4" />
-                                                Creado: {formatDate(request.createdAt)}
-                                            </span>
-                                            {request.dueDate && (
+                                            <p className="text-sm text-gray-600">{request.description}</p>
+                                            <div className="flex items-center gap-4 text-sm text-gray-500">
                                                 <span className="flex items-center gap-1">
-                                                    <Calendar className="h-4 w-4" />
-                                                    {getTimeRemaining(request.dueDate)}
+                                                    <Clock className="h-4 w-4" />
+                                                    Creado: {formatDate(request.createdAt)}
                                                 </span>
+                                                {request.dueDate && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="h-4 w-4" />
+                                                        {getTimeRemaining(request.dueDate)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {request.status === 'pending' ? (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => handleStartWork(request.id)}
+                                                    className="flex items-center gap-1"
+                                                >
+                                                    <Clock className="h-4 w-4" />
+                                                    Iniciar
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedRequest(request);
+                                                        setShowDialog(true);
+                                                    }}
+                                                    className="flex items-center gap-1"
+                                                >
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    Completar
+                                                </Button>
                                             )}
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {request.status === 'pending' ? (
-                                            <Button
-                                                size="sm"
-                                                onClick={() => handleStartWork(request.id)}
-                                                className="flex items-center gap-1"
-                                            >
-                                                <Clock className="h-4 w-4" />
-                                                Iniciar
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedRequest(request);
-                                                    setShowDialog(true);
-                                                }}
-                                                className="flex items-center gap-1"
-                                            >
-                                                <CheckCircle className="h-4 w-4" />
-                                                Completar
-                                            </Button>
-                                        )}
                                     </div>
                                 </div>
-                            </div>
-                        ))
-                        }
+                            ))
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -292,22 +277,23 @@ const MaintenanceStaffView = ({ hotelId }) => {
                                 placeholder="Describe el trabajo realizado y cualquier observación importante..."
                                 className="mt-1"
                                 rows={4}
+                                disabled={loading}
                             />
                         </div>
 
-                        {/* Agregar sección de imágenes */}
                         <div>
                             <label className="text-sm font-medium">
-                                Imágenes del Trabajo Completado
+                                Imágenes del trabajo realizado
                             </label>
-                            <div className="mt-2">
-                                <ImageUpload
-                                    onImagesSelected={setCompletionImages}
-                                    maxImages={3}
-                                />
-                            </div>
+                            <ImageUpload
+                                onImagesSelected={setSelectedImages}
+                                maxImages={3}
+                                quality={0.8}
+                                maxWidth={1280}
+                                maxHeight={720}
+                            />
                             <p className="text-xs text-gray-500 mt-1">
-                                Sube imágenes que muestren el trabajo finalizado (máximo 3 imágenes)
+                                Puedes subir hasta 3 imágenes del trabajo realizado
                             </p>
                         </div>
 
@@ -316,22 +302,24 @@ const MaintenanceStaffView = ({ hotelId }) => {
                                 variant="outline"
                                 onClick={() => {
                                     setShowDialog(false);
-                                    setCompletionImages([]);
                                     setCompletionNotes('');
+                                    setSelectedImages([]);
                                 }}
-                                disabled={loading}
+                                disabled={loading || isUploadingImages}
                             >
                                 Cancelar
                             </Button>
                             <Button
                                 onClick={handleCompleteWork}
-                                disabled={loading || !completionNotes.trim()}
+                                disabled={loading || isUploadingImages || !completionNotes.trim()}
                             >
-                                {loading ? (
+                                {isUploadingImages ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Guardando...
+                                        Subiendo imágenes...
                                     </>
+                                ) : loading ? (
+                                    'Completando...'
                                 ) : (
                                     'Completar Trabajo'
                                 )}
