@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
-import { uploadMaintenanceImages } from '@/lib/services/storage';
+import { uploadMaintenanceImages } from '@/app/services/storage';
 
 interface MaintenanceDialogProps {
   isOpen: boolean;
