@@ -1,78 +1,12 @@
-// // components/maintenance/MaintenanceDialog.tsx
-// import { useState } from 'react';
-// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-// import { Button } from '@/components/ui/button';
-// import { Textarea } from '@/components/ui/textarea';
-// import { AlertTriangle } from 'lucide-react';
-
-// interface MaintenanceDialogProps {
-//   open: boolean;
-//   onOpenChange: (open: boolean) => void;
-//   onSubmit: (notes: string) => Promise<void>;
-// }
-
-// export function MaintenanceDialog({ open, onOpenChange, onSubmit }: MaintenanceDialogProps) {
-//   const [notes, setNotes] = useState('');
-//   const [isSubmitting, setIsSubmitting] = useState(false);
-
-//   const handleSubmit = async () => {
-//     setIsSubmitting(true);
-//     try {
-//       await onSubmit(notes);
-//       setNotes('');
-//       onOpenChange(false);
-//     } finally {
-//       setIsSubmitting(false);
-//     }
-//   };
-
-//   return (
-//     <Dialog open={open} onOpenChange={onOpenChange}>
-//       <DialogContent>
-//         <DialogHeader>
-//           <DialogTitle className="flex items-center gap-2">
-//             <AlertTriangle className="h-5 w-5 text-yellow-500" />
-//             Solicitar Mantenimiento
-//           </DialogTitle>
-//           <DialogDescription>
-//             Describe el problema que requiere atención de mantenimiento
-//           </DialogDescription>
-//         </DialogHeader>
-//         <div className="py-4">
-//           <Textarea
-//             value={notes}
-//             onChange={(e) => setNotes(e.target.value)}
-//             placeholder="Describe el problema detalladamente..."
-//             className="min-h-[150px]"
-//           />
-//         </div>
-//         <DialogFooter className="flex gap-2">
-//           <Button 
-//             variant="outline" 
-//             onClick={() => onOpenChange(false)}
-//             disabled={isSubmitting}
-//           >
-//             Cancelar
-//           </Button>
-//           <Button 
-//             onClick={handleSubmit}
-//             disabled={isSubmitting || !notes.trim()}
-//           >
-//             {isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}
-//           </Button>
-//         </DialogFooter>
-//       </DialogContent>
-//     </Dialog>
-//   );
-// }
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
+import { uploadMaintenanceImages } from '@/lib/services/storage';
 
 interface MaintenanceDialogProps {
   isOpen: boolean;
@@ -80,8 +14,10 @@ interface MaintenanceDialogProps {
   onSubmit: (data: {
     description: string;
     priority: string;
-    images: File[];
+    imageUrls?: string[];
   }) => Promise<void>;
+  hotelId: string;
+  roomId: string;
   loading?: boolean;
 }
 
@@ -89,12 +25,15 @@ const MaintenanceDialog = ({
   isOpen,
   onClose,
   onSubmit,
+  hotelId,
+  roomId,
   loading = false
 }: MaintenanceDialogProps) => {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [error, setError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleSubmit = async () => {
     try {
@@ -104,10 +43,27 @@ const MaintenanceDialog = ({
         return;
       }
 
+      setIsUploading(true);
+
+      // Si hay imágenes seleccionadas, subirlas primero
+      let imageUrls: string[] = [];
+      if (selectedImages.length > 0) {
+        try {
+          // Generar un ID único para el mantenimiento
+          const maintenanceId = `maintenance_${Date.now()}`;
+          imageUrls = await uploadMaintenanceImages(hotelId, maintenanceId, selectedImages);
+        } catch (error) {
+          console.error('Error subiendo imágenes:', error);
+          setError('Error al subir las imágenes. Por favor, intente nuevamente.');
+          return;
+        }
+      }
+
+      // Enviar la solicitud con las URLs de las imágenes
       await onSubmit({
         description: description.trim(),
         priority,
-        images: selectedImages
+        imageUrls
       });
 
       // Limpiar el formulario
@@ -118,11 +74,21 @@ const MaintenanceDialog = ({
     } catch (error) {
       console.error('Error:', error);
       setError('Error al crear la solicitud');
+    } finally {
+      setIsUploading(false);
     }
   };
 
+  const handleClose = () => {
+    setDescription('');
+    setPriority('medium');
+    setSelectedImages([]);
+    setError('');
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Nueva Solicitud de Mantenimiento</DialogTitle>
@@ -142,13 +108,17 @@ const MaintenanceDialog = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe el problema que requiere mantenimiento..."
               className="min-h-[100px]"
-              disabled={loading}
+              disabled={loading || isUploading}
             />
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Prioridad</label>
-            <Select value={priority} onValueChange={setPriority}>
+            <Select 
+              value={priority} 
+              onValueChange={setPriority}
+              disabled={loading || isUploading}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -165,9 +135,13 @@ const MaintenanceDialog = ({
             <ImageUpload
               onImagesSelected={setSelectedImages}
               maxImages={3}
+              maxSize={5}
+              quality={0.8}
+              maxWidth={1920}
+              maxHeight={1080}
             />
             <p className="text-xs text-gray-500">
-              Puedes subir hasta 3 imágenes (JPG, PNG o WebP, máx. 5MB cada una)
+              Puedes subir hasta 3 imágenes o tomarlas con la cámara
             </p>
           </div>
         </div>
@@ -176,16 +150,25 @@ const MaintenanceDialog = ({
           <Button
             type="button"
             variant="outline"
-            onClick={onClose}
-            disabled={loading}
+            onClick={handleClose}
+            disabled={loading || isUploading}
           >
             Cancelar
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !description.trim()}
+            disabled={loading || isUploading || !description.trim()}
           >
-            {loading ? 'Creando...' : 'Crear Solicitud'}
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Subiendo...
+              </>
+            ) : loading ? (
+              'Creando...'
+            ) : (
+              'Crear Solicitud'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
