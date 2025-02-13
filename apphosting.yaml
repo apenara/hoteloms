@@ -65,3 +65,16 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  - variable: FIREBASE_CLIENT_EMAIL
+    value: "firebase-adminsdk-v12qy@roomflowapp.iam.gserviceaccount.com"
+    availability:
+      - BUILD
+      - RUNTIME
+
+
+  - variable: FIREBASE_PRIVATE_KEY
+    value: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDVn78ujGYfIcg7\nXk2crm4zDBA2vL3ilz4EJgLV1LbQaZVvte6ITDlJ7GVCsyjPiYwSP0KwUCwJqz64\nEK1OpIreChSp4QRe2K6S8Kr+3XTj5D8ixfBVZeKpTMnbAiC3oVw6t+r8y+iZDcAU\nw8qfGSi2epUqmtZO8xyuz4fgvOgm9Ady3STkrI63243ituqm0KDFhLEBgZKmX7RG\nlI5ID8ORMvpbjF38KnRtLhKuPcDdv+qXXGpvqLXMhaVq97708lbfA7MpMzWL8XWe\nEItw43oJZ7phGPlAkoxpYH5poILlVxAKvXtfNlANRYCxv9FM/uXRwqt3yxZMo3uq\nwEyXo26vAgMBAAECggEAY8BxCyDnTNE/CS3raubusWqIJa8zsduyy0gemc/2v9IV\nxDC9niqNs82tqRw0ydhuLlUY5HDDZ45tvpCXBLqD19P4Oy1GF63xss6r4k/x1bqO\nmsO4CoCFe03OkjRnp6ezA/4+veXPiqynjWqxsmISp0cNYXQk73/JXH2u8svzUcBW\nNS/BVl4Vht3valwYvSJa/Xtc1pCPEBEmM3Hxag0n6ZE+xpCzypLdwcNfsvMDLrjP\nvFkB02Va5VPYoKm2lDGQSCaCnWS1LzkFoGAPaNXETXlXGgf4bjGm/2Yv609/anaf\nkQor3eil4ih980VGLluBJ5hzkjv02Ny7zua+yDbn0QKBgQDx+bZfykHztAusjdp/\nga/Xl/phsIdWMsmisHkrwDCXeMiTlFL+lgnn3xdnsmDKHkQLgIqRsRNJ/Cr3oAGs\nhABTB3ee3G1QxdfCcxzdIiMvon6Irt/cnD4EqnbT3310yXQ30sBSS/YFpVAZCP3D\nHPD7zJF9Iqi8INpI+sw4CfcScQKBgQDiAV9uqtpVcNvNeEAcjQMayHWD30KTAr2F\ngyZh3aHuEqz6b61L4VwUAV/OaZkHJXDIltlbdkBX4tokS8atHe5K6oz/TK63g4gT\n1Y6ZqJ9hWara5PiD33W31Vr68nllXjXWN9C/7B41NcA+Chyit5vZPRR6Z8JlpDRE\nw3+jNj7jHwKBgAkI6N1UwPenflQYC9N89SLYotmo7LS0OsEfU7bleyr8sIiKHjsx\nQPduZgJSL7j8PlAroYDlGrJFfxk12Tomx5hSDA5bbp14daDmCWrcTnIF4DGcTfF/\nx/UGpF8u1hFZQEShUtr/yRTW4lG8+zSgzQKp1bjVZXV4yI23B48EGDyRAoGAURhl\nAfTUeywP8t5fQt9macncQQFvhgjJsIqqzxsT67VP1F0WNdAbliIYGpzRiDrrCU73\nl1YLKH4CAFwgYiYHR2J6TXFakAbmYReUH5bd+bSPFhRrCAa62sf36WvwG2t+retB\nQFydSkKLRLekJs7zYTQFkRaCLq6JAtOTjSD918kCgYBOj06qHscOUu8iIzL6Ft7Z\nWQzl+8N136U+GqRnBij+wTptLy0DbEiF2yew0SEvGpm4ZTIUdwXi4Vs16ySVFg0s\nVW8g5T1+65Cil+yarlKvrw1wP0BRC+QIcSMAIH1JviuojccR/Mrr1GZW8Lgc9nx3\ngQxGH7qnlgfVw0KX4F2OaQ==\n-----END PRIVATE KEY-----\n"
+    availability:
+      - BUILD
+      - RUNTIME

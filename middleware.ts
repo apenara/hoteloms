@@ -1,6 +1,11 @@
 // middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { auth } from 'firebase-admin'
+import { initAdmin } from '@/lib/firebase/admin-config'
+
+// Inicializar Firebase Admin
+initAdmin()
 
 // Rutas que requieren autenticación de nivel 1 (usuarios administrativos)
 const LEVEL_1_ROUTES = [
@@ -57,7 +62,22 @@ export async function middleware(request: NextRequest) {
   // Obtener tokens de autenticación
   const authToken = request.cookies.get('authToken')?.value
   const staffAccess = request.cookies.get('staffAccess')?.value
-  const staffSession = request.cookies.get('currentStaffSession')?.value
+  const firebaseToken = request.cookies.get('firebase-token')?.value
+
+  // Verificar token de Firebase si existe
+  let decodedToken = null
+  if (firebaseToken) {
+    try {
+      decodedToken = await auth().verifyIdToken(firebaseToken)
+    } catch (error) {
+      console.error('Error verificando token:', error)
+      // Si el token es inválido, limpiar cookies
+      const response = NextResponse.redirect(new URL('/', request.url))
+      response.cookies.delete('staffAccess')
+      response.cookies.delete('firebase-token')
+      return response
+    }
+  }
 
   // Verificar rutas de nivel 1 (requieren authToken)
   if (LEVEL_1_ROUTES.some(route => pathname.startsWith(route))) {
@@ -66,41 +86,57 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Verificar rutas de nivel 2 (aceptan authToken o staffAccess)
+  // Verificar rutas de nivel 2 (aceptan authToken o staffAccess con token válido)
   if (LEVEL_2_ROUTES.some(route => pathname.startsWith(route))) {
-    if (!authToken && !staffAccess) {
+    if (!authToken && (!staffAccess || !decodedToken)) {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }
 
   // Verificar rutas de acceso de personal
   if (STAFF_ACCESS_ROUTES.some(route => pathname.includes(route))) {
-    // Si no hay sesión de staff o authToken, redirigir al login correspondiente
-    if (!staffSession && !authToken) {
+    if (!decodedToken && !authToken) {
       // Extraer la ruta base para redirigir al login correspondiente
       const baseRoute = pathname.split('/staff')[0]
       return NextResponse.redirect(new URL(`${baseRoute}/login`, request.url))
     }
+
+    // Verificar que el token corresponda al hotel correcto
+    if (decodedToken) {
+      const hotelIdFromPath = pathname.split('/')[2] // Extraer hotelId de la URL
+      if (decodedToken.hotelId !== hotelIdFromPath) {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+    }
   }
 
   // Si hay staffAccess, verificar que la sesión no haya expirado
-  if (staffAccess) {
-    try {
-      const session = JSON.parse(staffSession || '{}')
-      const sessionStart = new Date(session.sessionStart || 0).getTime()
-      const now = new Date().getTime()
-      const SESSION_DURATION = 8 * 60 * 60 * 1000 // 8 horas
+  if (staffAccess && decodedToken) {
+    const tokenExp = decodedToken.exp * 1000 // Convertir a milisegundos
+    const now = Date.now()
 
-      if (now - sessionStart > SESSION_DURATION) {
-        // Limpiar cookies de sesión expirada
-        const response = NextResponse.redirect(new URL('/', request.url))
-        response.cookies.delete('staffAccess')
-        response.cookies.delete('currentStaffSession')
-        return response
-      }
-    } catch (error) {
-      console.error('Error verificando sesión:', error)
+    if (now >= tokenExp) {
+      // Limpiar cookies de sesión expirada
+      const response = NextResponse.redirect(new URL('/', request.url))
+      response.cookies.delete('staffAccess')
+      response.cookies.delete('firebase-token')
+      return response
     }
+  }
+
+  // Clonar y modificar los headers para pasar información del token
+  if (decodedToken) {
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-user-role', decodedToken.role)
+    requestHeaders.set('x-user-hotel', decodedToken.hotelId)
+    requestHeaders.set('x-access-type', decodedToken.accessType)
+
+    // Devolver la respuesta con los headers modificados
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
   }
 
   return NextResponse.next()
