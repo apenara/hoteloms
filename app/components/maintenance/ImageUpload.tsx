@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Upload, X, Camera, Image as ImageIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Compressor from 'compressorjs';
 
@@ -23,9 +23,6 @@ const ImageUpload = ({
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [processing, setProcessing] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   const processImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
@@ -42,71 +39,6 @@ const ImageUpload = ({
         },
       });
     });
-  };
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment', // Usar cámara trasera por defecto
-          width: { ideal: maxWidth },
-          height: { ideal: maxHeight }
-        } 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-      }
-      setShowCamera(true);
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('No se pudo acceder a la cámara. Por favor, verifica los permisos.');
-    }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setShowCamera(false);
-  };
-
-  const takePhoto = async () => {
-    if (!videoRef.current) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Dibujar el frame actual del video en el canvas
-    ctx.drawImage(videoRef.current, 0, 0);
-
-    // Convertir el canvas a un archivo
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-
-      try {
-        setProcessing(true);
-        const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        const processedFile = await processImage(file);
-        
-        setSelectedImages(prev => [...prev, processedFile]);
-        const newPreview = URL.createObjectURL(processedFile);
-        setPreviews(prev => [...prev, newPreview]);
-        onImagesSelected([processedFile]);
-        
-        stopCamera();
-      } catch (error) {
-        console.error('Error processing photo:', error);
-        alert('Error al procesar la foto. Por favor, intenta de nuevo.');
-      } finally {
-        setProcessing(false);
-      }
-    }, 'image/jpeg', quality);
   };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,52 +87,22 @@ const ImageUpload = ({
 
   return (
     <div className="space-y-4">
-      {showCamera ? (
-        <div className="space-y-4">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="w-full rounded-lg"
-          />
-          <div className="flex justify-center gap-4">
-            <Button onClick={takePhoto} disabled={processing}>
-              Tomar Foto
-            </Button>
-            <Button variant="outline" onClick={stopCamera}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => document.getElementById('image-upload')?.click()}
-            className="flex items-center gap-2"
-            disabled={processing}
-          >
-            <Upload className="h-4 w-4" />
-            {processing ? 'Procesando...' : 'Seleccionar'}
-          </Button>
+      <div className="flex items-center gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => document.getElementById('image-upload')?.click()}
+          className="flex items-center gap-2"
+          disabled={processing}
+        >
+          <Upload className="h-4 w-4" />
+          {processing ? 'Procesando...' : 'Agregar Imágenes'}
+        </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={startCamera}
-            className="flex items-center gap-2"
-            disabled={processing}
-          >
-            <Camera className="h-4 w-4" />
-            Usar Cámara
-          </Button>
-
-          <span className="text-sm text-gray-500">
-            {selectedImages.length}/{maxImages} imágenes
-          </span>
-        </div>
-      )}
+        <span className="text-sm text-gray-500">
+          {selectedImages.length}/{maxImages} imágenes
+        </span>
+      </div>
 
       <input
         id="image-upload"
