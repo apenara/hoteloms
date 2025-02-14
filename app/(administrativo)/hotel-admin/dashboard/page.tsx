@@ -24,6 +24,7 @@ import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog"
 import { ROOM_STATES } from "@/app/lib/constants/room-states";
 import { User, Room } from "@/app/lib/types";
 import { Button } from "@/app/components/ui/button";
+import AuthMonitor from "@/app/components/dashboard/AuthMonitor";
 
 const ESTADOS: Record<
   string,
@@ -96,6 +97,15 @@ export default function HotelDashboard() {
   }, [habitaciones]);
 
   const [estadoFiltrado, setEstadoFiltrado] = useState("todos");
+
+  const updateSessionHeartbeat = async () => {
+    const sessionId = getCookie('staffAccess');
+    if (sessionId) {
+      await updateDoc(doc(db, 'hotels', hotelId, 'active_sessions', sessionId), {
+        lastHeartbeat: serverTimestamp()
+      });
+    }
+  };
 
   const habitacionesFiltradas = useMemo(() => {
     // Primero filtramos las habitaciones
@@ -171,7 +181,7 @@ export default function HotelDashboard() {
               </Select>
             </div>
           </div>
-
+                  <div className="flex flex-col sm:flex-row gap-4 mb-4"><AuthMonitor></AuthMonitor></div>
           {/* Contadores de estado */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
             <Card

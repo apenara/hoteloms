@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
   // Obtener tokens de autenticación
   const authToken = request.cookies.get('authToken')?.value
   const staffAccess = request.cookies.get('staffAccess')?.value
-  const staffSession = request.cookies.get('currentStaffSession')?.value
+  const firebaseToken = request.cookies.get('firebase-token')?.value
 
   // Verificar rutas de nivel 1 (requieren authToken)
   if (LEVEL_1_ROUTES.some(route => pathname.startsWith(route))) {
@@ -76,33 +76,46 @@ export async function middleware(request: NextRequest) {
   // Verificar rutas de acceso de personal
   if (STAFF_ACCESS_ROUTES.some(route => pathname.includes(route))) {
     // Si no hay sesión de staff o authToken, redirigir al login correspondiente
-    if (!staffSession && !authToken) {
+    if (!staffAccess && !authToken) {
       // Extraer la ruta base para redirigir al login correspondiente
       const baseRoute = pathname.split('/staff')[0]
       return NextResponse.redirect(new URL(`${baseRoute}/login`, request.url))
+    }
+
+    // Si hay un token de Firebase, verificar el hotelId
+    if (firebaseToken) {
+      const hotelIdFromPath = pathname.split('/')[2] // Extraer hotelId de la URL
+      const response = NextResponse.next()
+      
+      // Agregar headers con información del token para uso en la API
+      response.headers.set('x-firebase-token', firebaseToken)
+      response.headers.set('x-hotel-id', hotelIdFromPath)
+      
+      return response
     }
   }
 
   // Si hay staffAccess, verificar que la sesión no haya expirado
   if (staffAccess) {
-    try {
-      const session = JSON.parse(staffSession || '{}')
-      const sessionStart = new Date(session.sessionStart || 0).getTime()
-      const now = new Date().getTime()
-      const SESSION_DURATION = 8 * 60 * 60 * 1000 // 8 horas
+    const SESSION_DURATION = 8 * 60 * 60 * 1000 // 8 horas
+    const sessionStart = request.cookies.get('sessionStart')?.value
+    
+    if (sessionStart) {
+      const now = Date.now()
+      const sessionStartTime = parseInt(sessionStart)
 
-      if (now - sessionStart > SESSION_DURATION) {
+      if (now - sessionStartTime > SESSION_DURATION) {
         // Limpiar cookies de sesión expirada
         const response = NextResponse.redirect(new URL('/', request.url))
         response.cookies.delete('staffAccess')
-        response.cookies.delete('currentStaffSession')
+        response.cookies.delete('firebase-token')
+        response.cookies.delete('sessionStart')
         return response
       }
-    } catch (error) {
-      console.error('Error verificando sesión:', error)
     }
   }
 
+  // Si llegamos aquí, permitir el acceso
   return NextResponse.next()
 }
 

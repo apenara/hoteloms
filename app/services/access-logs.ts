@@ -1,7 +1,17 @@
-// src/lib/services/access-logs.ts
-import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
+// src/services/access-logs.ts
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import type { AccessLog } from '@/app/lib/constants/permissions';
+import type { UserRole, StaffRole } from '@/lib/types';
+
+interface LogAccessParams {
+  userId: string;
+  userName: string;
+  role: UserRole | StaffRole;
+  accessType: 'pin' | 'email';
+  hotelId: string;
+  roomId?: string;  // Opcional
+  action?: string;  // Opcional
+}
 
 export async function logAccess({
   userId,
@@ -10,65 +20,39 @@ export async function logAccess({
   accessType,
   hotelId,
   roomId,
-  action
-}: AccessLog) {
+  action = 'login'  // valor por defecto
+}: LogAccessParams) {
   try {
     const logsRef = collection(db, 'hotels', hotelId, 'access_logs');
     
-    await addDoc(logsRef, {
+    // Crear objeto base de log
+    const logData: any = {
       userId,
       userName,
       role,
       accessType,
-      timestamp: new Date(),
-      hotelId,
-      roomId,
       action,
-      ipAddress: '', // Se puede implementar la captura de IP si es necesario
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : ''
-    });
+      timestamp: serverTimestamp(),
+      device: {
+        userAgent: window.navigator.userAgent,
+        platform: window.navigator.platform
+      }
+    };
+
+    // Solo agregar roomId si está definido
+    if (roomId) {
+      logData.roomId = roomId;
+    }
+
+    // Agregar el log
+    const docRef = await addDoc(logsRef, logData);
     
+    return {
+      success: true,
+      logId: docRef.id
+    };
   } catch (error) {
-    console.error('Error al registrar acceso:', error);
-    // Podríamos manejar el error de forma más específica si es necesario
-  }
-}
-
-export async function getAccessLogs(
-  hotelId: string,
-  filters?: {
-    userId?: string;
-    role?: string;
-    startDate?: Date;
-    endDate?: Date;
-  }
-) {
-  try {
-    const logsRef = collection(db, 'hotels', hotelId, 'access_logs');
-    let q = query(logsRef, orderBy('timestamp', 'desc'));
-
-    // Aplicar filtros si existen
-    if (filters?.userId) {
-      q = query(q, where('userId', '==', filters.userId));
-    }
-    if (filters?.role) {
-      q = query(q, where('role', '==', filters.role));
-    }
-    if (filters?.startDate) {
-      q = query(q, where('timestamp', '>=', filters.startDate));
-    }
-    if (filters?.endDate) {
-      q = query(q, where('timestamp', '<=', filters.endDate));
-    }
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-  } catch (error) {
-    console.error('Error al obtener logs de acceso:', error);
+    console.error('Error registrando acceso:', error);
     throw error;
   }
 }

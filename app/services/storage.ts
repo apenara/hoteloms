@@ -1,45 +1,49 @@
-// src/lib/services/storage.ts
-import { storage } from '@/lib/firebase/config';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// src/app/services/storage.ts
+import { ref, uploadBytes, getDownloadURL, getAuth } from 'firebase/storage';
+import { storage, auth } from '@/lib/firebase/config';
+import { v4 as uuidv4 } from 'uuid';
 
-export const uploadMaintenanceImages = async (
+export async function uploadMaintenanceImages(
   hotelId: string,
   maintenanceId: string,
   files: File[]
-): Promise<string[]> => {
-  if (!files || !Array.isArray(files) || files.length === 0) {
-    console.log('No hay archivos para subir');
-    return [];
-  }
-
+): Promise<string[]> {
   try {
-    const uploadPromises = files.map(async (file) => {
-      try {
-        // Crear una referencia única para la imagen
-        const imageRef = ref(
-          storage,
-          `hotels/${hotelId}/maintenance/${maintenanceId}/${Date.now()}_${file.name}`
-        );
-
-        // Subir la imagen
-        const uploadResult = await uploadBytes(imageRef, file);
-        
-        // Obtener la URL de descarga
-        const downloadURL = await getDownloadURL(uploadResult.ref);
-        
-        return downloadURL;
-      } catch (error) {
-        console.error('Error al subir imagen individual:', error);
-        throw error;
+    // Obtener token de autenticación
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      // Si no hay token, crear uno temporal para el staff
+      const staffSession = sessionStorage.getItem('currentStaffSession');
+      if (!staffSession) {
+        throw new Error('No hay una sesión activa');
       }
+      // Aquí podrías implementar una llamada a tu API para generar un token temporal
+    }
+
+    const uploadPromises = files.map(async (file) => {
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${uuidv4()}.${extension}`;
+      
+      const storageRef = ref(
+        storage,
+        `hotels/${hotelId}/maintenance/${maintenanceId}/${fileName}`
+      );
+
+      const metadata = {
+        contentType: file.type,
+        customMetadata: {
+          hotelId,
+          maintenanceId
+        }
+      };
+
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      return await getDownloadURL(snapshot.ref);
     });
 
-    // Esperar a que todas las imágenes se suban
-    const urls = await Promise.all(uploadPromises);
-    console.log('URLs de imágenes subidas:', urls);
-    return urls;
+    return await Promise.all(uploadPromises);
   } catch (error) {
-    console.error('Error en uploadMaintenanceImages:', error);
+    console.error('Error al subir imágenes:', error);
     throw error;
   }
-};
+}

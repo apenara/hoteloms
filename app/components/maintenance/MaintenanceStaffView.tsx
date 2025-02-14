@@ -15,7 +15,8 @@ import {
     AlertTriangle,
     Calendar,
     Home,
-    Loader2
+    Loader2,
+    ImageIcon
 } from 'lucide-react';
 import { uploadMaintenanceImages } from '@/app/services/storage';
 
@@ -29,6 +30,8 @@ const MaintenanceStaffView = ({ hotelId }) => {
     const [error, setError] = useState('');
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [isUploadingImages, setIsUploadingImages] = useState(false);
+    const [showImagesDialog, setShowImagesDialog] = useState(false);
+    const [currentImages, setCurrentImages] = useState([]);
 
     useEffect(() => {
         if (!hotelId || !staff?.id) return;
@@ -71,15 +74,23 @@ const MaintenanceStaffView = ({ hotelId }) => {
 
     const handleCompleteWork = async () => {
         if (!selectedRequest || !completionNotes.trim()) return;
-
+        
+        // Verificar sesión activa
+        const staffSession = sessionStorage.getItem('currentStaffSession');
+        if (!staffSession) {
+            setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+            return;
+        }
+    
         setLoading(true);
-        setIsUploadingImages(true);
+        setError('');
+        
         try {
-            const timestamp = Timestamp.now();
+            let imageUrls: string[] = [];
             
             // Subir imágenes si hay alguna seleccionada
-            let imageUrls: string[] = [];
             if (selectedImages.length > 0) {
+                setIsUploadingImages(true);
                 try {
                     imageUrls = await uploadMaintenanceImages(
                         hotelId,
@@ -87,25 +98,30 @@ const MaintenanceStaffView = ({ hotelId }) => {
                         selectedImages
                     );
                 } catch (error) {
-                    console.error('Error subiendo imágenes:', error);
-                    setError('Error al subir las imágenes');
-                    return;
+                    console.error('Error al subir imágenes:', error);
+                    throw new Error('Error al subir las imágenes: ' + error.message);
+                } finally {
+                    setIsUploadingImages(false);
                 }
             }
-
+    
+            const timestamp = Timestamp.now();
+            
+            // Actualizar registro de mantenimiento
             const requestRef = doc(db, 'hotels', hotelId, 'maintenance', selectedRequest.id);
             await updateDoc(requestRef, {
                 status: 'completed',
                 completedAt: timestamp,
                 completionNotes,
-                completionImages: imageUrls, // Agregar URLs de las imágenes
+                completionImages: imageUrls,
                 completedBy: {
                     id: staff.id,
                     name: staff.name,
                     timestamp
                 }
             });
-
+    
+            // Registrar en historial
             const historyRef = collection(db, 'hotels', hotelId, 'rooms', selectedRequest.roomId, 'history');
             await addDoc(historyRef, {
                 type: 'maintenance_completed',
@@ -113,20 +129,21 @@ const MaintenanceStaffView = ({ hotelId }) => {
                 staffId: staff.id,
                 staffName: staff.name,
                 notes: completionNotes,
-                images: imageUrls, // Agregar URLs de las imágenes
+                images: imageUrls,
                 maintenanceId: selectedRequest.id
             });
-
+    
+            // Limpiar estado
             setShowDialog(false);
             setCompletionNotes('');
             setSelectedImages([]);
             setSelectedRequest(null);
+            
         } catch (error) {
             console.error('Error:', error);
-            setError('Error al completar el trabajo');
+            setError(error instanceof Error ? error.message : 'Error al completar el trabajo');
         } finally {
             setLoading(false);
-            setIsUploadingImages(false);
         }
     };
 
@@ -173,7 +190,7 @@ const MaintenanceStaffView = ({ hotelId }) => {
     };
 
     return (
-        <div className="p-4 max-w-4xl mx-auto">
+        <div className="container mx-auto px-4 py-6">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -199,7 +216,7 @@ const MaintenanceStaffView = ({ hotelId }) => {
                                     key={request.id}
                                     className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
                                 >
-                                    <div className="flex justify-between items-start mb-2">
+                                    <div className="flex flex-col gap-3">
                                         <div className="space-y-2">
                                             <div className="flex items-center gap-2">
                                                 <Home className="h-4 w-4 text-gray-500" />
@@ -216,15 +233,30 @@ const MaintenanceStaffView = ({ hotelId }) => {
                                                 )}
                                             </div>
                                             <p className="text-sm text-gray-600">{request.description}</p>
+                                            {request.images?.length > 0 && (
+                                                <div className="flex gap-2 mt-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setCurrentImages(request.images);
+                                                            setShowImagesDialog(true);
+                                                        }}
+                                                        className="flex items-center gap-2"
+                                                    >
+                                                        <ImageIcon className="h-4 w-4" />
+                                                        Ver Imágenes ({request.images.length})
+                                                    </Button>
+                                                </div>)}
                                             <div className="flex items-center gap-4 text-sm text-gray-500">
                                                 <span className="flex items-center gap-1">
                                                     <Clock className="h-4 w-4" />
                                                     Creado: {formatDate(request.createdAt)}
                                                 </span>
-                                                {request.dueDate && (
+                                                {request.scheduledFor && (
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-4 w-4" />
-                                                        {getTimeRemaining(request.dueDate)}
+                                                        {getTimeRemaining(request.scheduledFor)}
                                                     </span>
                                                 )}
                                             </div>
@@ -325,6 +357,24 @@ const MaintenanceStaffView = ({ hotelId }) => {
                                 )}
                             </Button>
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+            {/* Diálogo para ver imágenes */}
+            <Dialog open={showImagesDialog} onOpenChange={setShowImagesDialog}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Imágenes de la Solicitud</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                        {currentImages.map((image, index) => (
+                            <img
+                                key={index}
+                                src={image}
+                                alt={`Imagen ${index + 1}`}
+                                className="w-full h-48 object-cover rounded-lg"
+                            />
+                        ))}
                     </div>
                 </DialogContent>
             </Dialog>

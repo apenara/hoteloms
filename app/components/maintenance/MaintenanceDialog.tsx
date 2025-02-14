@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
+import { UploadResult } from 'firebase/storage';
 import { uploadMaintenanceImages } from '@/app/services/storage';
 
 interface MaintenanceDialogProps {
@@ -14,10 +14,9 @@ interface MaintenanceDialogProps {
   onSubmit: (data: {
     description: string;
     priority: string;
-    imageUrls?: string[];
+    images: UploadResult[];
   }) => Promise<void>;
   hotelId: string;
-  roomId: string;
   loading?: boolean;
 }
 
@@ -26,7 +25,6 @@ const MaintenanceDialog = ({
   onClose,
   onSubmit,
   hotelId,
-  roomId,
   loading = false
 }: MaintenanceDialogProps) => {
   const [description, setDescription] = useState('');
@@ -38,57 +36,55 @@ const MaintenanceDialog = ({
   const handleSubmit = async () => {
     try {
       setError('');
+      setIsUploading(true);
+
       if (!description.trim()) {
         setError('La descripción es requerida');
         return;
       }
 
-      setIsUploading(true);
-
-      // Si hay imágenes seleccionadas, subirlas primero
-      let imageUrls: string[] = [];
-      if (selectedImages.length > 0) {
-        try {
-          // Generar un ID único para el mantenimiento
-          const maintenanceId = `maintenance_${Date.now()}`;
-          imageUrls = await uploadMaintenanceImages(hotelId, maintenanceId, selectedImages);
-        } catch (error) {
-          console.error('Error subiendo imágenes:', error);
-          setError('Error al subir las imágenes. Por favor, intente nuevamente.');
-          return;
-        }
+      // Obtener ID de sesión
+      const staffSession = getCookie('staffAccess');
+      if (!staffSession) {
+        throw new Error('Sesión no válida');
       }
 
-      // Enviar la solicitud con las URLs de las imágenes
+      // Generar ID temporal para el mantenimiento
+      const tempMaintenanceId = crypto.randomUUID();
+
+      // Subir imágenes si hay
+      let uploadedImages = [];
+      if (selectedImages.length > 0) {
+        uploadedImages = await uploadMaintenanceImages(
+          hotelId,
+          tempMaintenanceId,
+          selectedImages,
+          staffSession
+        );
+      }
+
+      // Enviar datos
       await onSubmit({
         description: description.trim(),
         priority,
-        imageUrls
+        images: uploadedImages
       });
 
-      // Limpiar el formulario
+      // Limpiar formulario
       setDescription('');
       setPriority('medium');
       setSelectedImages([]);
       onClose();
     } catch (error) {
-      console.error('Error:', error);
-      setError('Error al crear la solicitud');
+      console.error('Error subiendo imágenes:', error);
+      setError('Error al crear la solicitud: ' + (error.message || 'Error desconocido'));
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleClose = () => {
-    setDescription('');
-    setPriority('medium');
-    setSelectedImages([]);
-    setError('');
-    onClose();
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Nueva Solicitud de Mantenimiento</DialogTitle>
@@ -114,11 +110,7 @@ const MaintenanceDialog = ({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Prioridad</label>
-            <Select 
-              value={priority} 
-              onValueChange={setPriority}
-              disabled={loading || isUploading}
-            >
+            <Select value={priority} onValueChange={setPriority}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -135,13 +127,10 @@ const MaintenanceDialog = ({
             <ImageUpload
               onImagesSelected={setSelectedImages}
               maxImages={3}
-              maxSize={5}
-              quality={0.8}
-              maxWidth={1920}
-              maxHeight={1080}
+              disabled={loading || isUploading}
             />
             <p className="text-xs text-gray-500">
-              Puedes subir hasta 3 imágenes o tomarlas con la cámara
+              Puedes subir hasta 3 imágenes (JPG, PNG o WebP, máx. 5MB cada una)
             </p>
           </div>
         </div>
@@ -150,7 +139,7 @@ const MaintenanceDialog = ({
           <Button
             type="button"
             variant="outline"
-            onClick={handleClose}
+            onClick={onClose}
             disabled={loading || isUploading}
           >
             Cancelar
@@ -159,16 +148,7 @@ const MaintenanceDialog = ({
             onClick={handleSubmit}
             disabled={loading || isUploading || !description.trim()}
           >
-            {isUploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Subiendo...
-              </>
-            ) : loading ? (
-              'Creando...'
-            ) : (
-              'Crear Solicitud'
-            )}
+            {isUploading ? 'Subiendo...' : loading ? 'Creando...' : 'Crear Solicitud'}
           </Button>
         </DialogFooter>
       </DialogContent>
