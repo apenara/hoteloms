@@ -3,10 +3,11 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
-import { initAdmin } from '@/lib/firebase/admin-config';
-
-// Inicializar Firebase Admin
-initAdmin();
+// import { 
+//   initAdmin
+//  } from 'firebase-admin'
+// // Inicializar Firebase Admin
+// initAdmin();
 
 export async function POST(request: Request) {
   try {
