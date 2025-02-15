@@ -52,20 +52,3 @@ export async function POST(request: Request) {
   }
 }
 
-// src/app/api/notifications/subscribe/route.ts
-export async function POST(request: Request) {
-  try {
-    const { token, topic } = await request.json();
-
-    // Suscribir el token al tema
-    await admin.messaging().subscribeToTopic(token, topic);
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error subscribing to topic:', error);
-    return NextResponse.json(
-      { error: 'Error subscribing to topic' },
-      { status: 500 }
-    );
-  }
-}
