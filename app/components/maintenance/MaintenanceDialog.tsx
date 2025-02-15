@@ -5,8 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageUpload from './ImageUpload';
-import { UploadResult } from 'firebase/storage';
-import { uploadMaintenanceImages } from '@/app/services/storage';
+import { useAuth } from '@/lib/auth';
 
 interface MaintenanceDialogProps {
   isOpen: boolean;
@@ -14,7 +13,7 @@ interface MaintenanceDialogProps {
   onSubmit: (data: {
     description: string;
     priority: string;
-    images: UploadResult[];
+    images: File[];
   }) => Promise<void>;
   hotelId: string;
   loading?: boolean;
@@ -27,6 +26,7 @@ const MaintenanceDialog = ({
   hotelId,
   loading = false
 }: MaintenanceDialogProps) => {
+  const { user, staff } = useAuth();
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -43,31 +43,15 @@ const MaintenanceDialog = ({
         return;
       }
 
-      // Obtener ID de sesión
-      const staffSession = getCookie('staffAccess');
-      if (!staffSession) {
-        throw new Error('Sesión no válida');
+      if (!user && !staff) {
+        throw new Error('No hay una sesión activa');
       }
 
-      // Generar ID temporal para el mantenimiento
-      const tempMaintenanceId = crypto.randomUUID();
-
-      // Subir imágenes si hay
-      let uploadedImages = [];
-      if (selectedImages.length > 0) {
-        uploadedImages = await uploadMaintenanceImages(
-          hotelId,
-          tempMaintenanceId,
-          selectedImages,
-          staffSession
-        );
-      }
-
-      // Enviar datos
+      // Enviar datos incluyendo las imágenes seleccionadas
       await onSubmit({
         description: description.trim(),
         priority,
-        images: uploadedImages
+        images: selectedImages // Pasar las imágenes tal cual las recibimos del ImageUpload
       });
 
       // Limpiar formulario
@@ -76,7 +60,7 @@ const MaintenanceDialog = ({
       setSelectedImages([]);
       onClose();
     } catch (error) {
-      console.error('Error subiendo imágenes:', error);
+      console.error('Error en la solicitud:', error);
       setError('Error al crear la solicitud: ' + (error.message || 'Error desconocido'));
     } finally {
       setIsUploading(false);

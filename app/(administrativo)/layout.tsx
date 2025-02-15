@@ -20,8 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
-import { notificationService } from "../services/notificationService";
+
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -44,15 +43,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
-
-  //modulo de mensajeria
-  useEffect(() => {
-    if (user) {
-      notificationService
-        .registerFCMToken(user.uid, user.hotelId, user.role)
-        .catch(console.error);
-    }
-  }, [user]);
 
   // Verificar autenticación
   useEffect(() => {
@@ -210,7 +200,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </Button>
 
           <div className="flex items-center space-x-4">
-            <NotificationsDialog hotelId={user?.hotelId || staff?.hotelId} />
+            {/* <NotificationsDialog hotelId={user?.hotelId || staff?.hotelId} /> */}
           </div>
         </header>
 

@@ -7,50 +7,42 @@ importScripts(
 );
 
 firebase.initializeApp({
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey:"AIzaSyA9XJg2fLAKgtg9URn3oH7Grc7RbT_aoDU",
+  authDomain: "roomflowapp.firebaseapp.com",
+  projectId: "roomflowapp",
+  storageBucket: "roomflowapp.firebasestorage.app",
+  messagingSenderId: "326036360008",
+  appId: "1:326036360008:web:c0586e26ef34e86978817d",
 });
 
 const messaging = firebase.messaging();
 
-// Manejar notificaciones en segundo plano
+// Manejo de notificaciones en segundo plano
 messaging.onBackgroundMessage((payload) => {
-  console.log("Recibida notificación en background:", payload);
+  console.log('Mensaje recibido en background:', payload);
 
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: "/logo-192.png",
-    badge: "/logo-96.png",
-    data: payload.data,
+    icon: '/ios/192.png', // Usa tu logo de la app
+    badge: '/ios/100.png',
+    tag: payload.data?.tag || 'default',
+    data: payload.data
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Manejar clic en la notificación
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
+// Manejo del clic en la notificación
+self.addEventListener('notificationclick', (event) => {
+  const notification = event.notification;
+  const action = event.action;
+  const data = notification.data;
 
-  const pathname = event.notification.data?.url || "/";
-  const urlToOpen = new URL(pathname, self.location.origin).href;
+  notification.close();
 
-  event.waitUntil(
-    clients.matchAll({ type: "window" }).then((windowClients) => {
-      // Si ya hay una ventana abierta, enfocarla
-      for (const client of windowClients) {
-        if (client.url === urlToOpen && "focus" in client) {
-          return client.focus();
-        }
-      }
-      // Si no hay ventana abierta, abrir una nueva
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
+  // Ejemplo de navegación al hacer clic
+  if (data && data.url) {
+    clients.openWindow(data.url);
+  }
 });

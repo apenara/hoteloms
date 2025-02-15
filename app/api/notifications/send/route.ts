@@ -1,66 +1,71 @@
 // src/app/api/notifications/send/route.ts
-import { getMessaging } from "firebase/messaging";
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { admin } from '@/lib/firebase/admin-config';
 
 export async function POST(request: Request) {
   try {
-    const { tokens, notification, data } = await request.json();
+    const { payload, target } = await request.json();
 
-    if (!tokens || !notification) {
-      return NextResponse.json(
-        { error: "Faltan tokens o datos de notificación" },
-        { status: 400 }
-      );
+    const message: admin.messaging.Message = {
+      notification: {
+        title: payload.title,
+        body: payload.body,
+      },
+      data: payload.data || {},
+      android: {
+        notification: {
+          icon: 'stock_ticker_update',
+          color: '#4CAF50',
+          priority: 'high',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            'mutable-content': 1,
+            sound: 'default',
+          },
+        },
+      },
+    };
+
+    // Configurar el destino de la notificación
+    if (target.topic) {
+      message.topic = target.topic;
+    } else if (target.token) {
+      message.token = target.token;
+    } else {
+      // Si no hay topic ni token, enviar a un topic basado en el hotelId
+      message.topic = `hotel_${target.hotelId}`;
     }
 
-    // Inicializar Firebase Admin si no está inicializado
-    initAdmin();
+    // Enviar la notificación
+    const response = await admin.messaging().send(message);
 
-    const messaging = getMessaging();
-
-    // Enviar notificación a múltiples dispositivos
-    const response = await messaging.sendMulticast({
-      tokens,
-      notification: {
-        title: notification.title,
-        body: notification.body,
-      },
-      data: data || {},
-      webpush: {
-        headers: {
-          Urgency: "high",
-        },
-        notification: {
-          icon: "/logo-192.png",
-          badge: "/logo-96.png",
-          vibrate: [100, 50, 100],
-          requireInteraction: true,
-          actions: [
-            {
-              action: "view",
-              title: "Ver detalles",
-            },
-          ],
-        },
-        fcmOptions: {
-          link: data?.url || "/",
-        },
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      results: response.responses,
-    });
+    return NextResponse.json({ success: true, messageId: response });
   } catch (error) {
-    console.error("Error al enviar notificación:", error);
+    console.error('Error sending notification:', error);
     return NextResponse.json(
-      { error: "Error al enviar notificación" },
+      { error: 'Error sending notification' },
       { status: 500 }
     );
   }
 }
 
-function initAdmin() {
-  throw new Error("Function not implemented.");
+// src/app/api/notifications/subscribe/route.ts
+export async function POST(request: Request) {
+  try {
+    const { token, topic } = await request.json();
+
+    // Suscribir el token al tema
+    await admin.messaging().subscribeToTopic(token, topic);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error subscribing to topic:', error);
+    return NextResponse.json(
+      { error: 'Error subscribing to topic' },
+      { status: 500 }
+    );
+  }
 }
