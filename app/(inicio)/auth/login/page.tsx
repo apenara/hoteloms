@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { registerUserToken } from "@/app/services/tokenService";
 
 export default function LoginPage() {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -38,10 +39,8 @@ export default function LoginPage() {
   const hotelId = searchParams.get("hotelId");
   const requiredRole = searchParams.get("role");
 
-  // Si no hay hotelId pero estamos en la pestaña de PIN, buscar en todos los hoteles
   const handlePinSearch = async (pin: string) => {
     try {
-      // Buscar en todos los hoteles por el PIN
       const hotelsRef = collection(db, "hotels");
       const hotelsSnapshot = await getDocs(hotelsRef);
 
@@ -55,7 +54,11 @@ export default function LoginPage() {
         const staffSnapshot = await getDocs(q);
 
         if (!staffSnapshot.empty) {
-          return hotelDoc.id;
+          return {
+            hotelId: hotelDoc.id,
+            staffData: staffSnapshot.docs[0].data(),
+            staffId: staffSnapshot.docs[0].id
+          };
         }
       }
       return null;
@@ -84,6 +87,13 @@ export default function LoginPage() {
         throw new Error("No se encontraron datos del usuario");
       }
 
+      // Registrar token FCM
+      const fcmToken = await registerUserToken(
+        userCredential.user.uid,
+        userData.hotelId || 'admin',
+        userData.role
+      );
+
       // Redireccionar según el rol
       if (userData.role === "super_admin") {
         window.location.href = "/admin/dashboard";
@@ -106,16 +116,25 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Si no hay hotelId, intentar encontrar el hotel correcto
       let targetHotelId = hotelId;
+      let staffInfo = null;
+
       if (!targetHotelId) {
-        targetHotelId = await handlePinSearch(pin);
-        if (!targetHotelId) {
+        staffInfo = await handlePinSearch(pin);
+        if (!staffInfo) {
           throw new Error("PIN no encontrado en ningún hotel");
         }
+        targetHotelId = staffInfo.hotelId;
       }
 
       const staffMember = await loginWithPin(pin, targetHotelId, requiredRole);
+
+      // Registrar token FCM
+      const fcmToken = await registerUserToken(
+        staffMember.id,
+        targetHotelId,
+        staffMember.role
+      );
 
       // Construir la URL de redirección según el rol
       let redirectUrl = "";
@@ -136,7 +155,6 @@ export default function LoginPage() {
       // Esperar un momento para asegurar que la sesión se guardó
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Usar window.location.href para forzar un refresh completo
       window.location.href = redirectUrl;
     } catch (error) {
       console.error("Error de login con PIN:", error);

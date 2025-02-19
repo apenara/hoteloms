@@ -1,13 +1,15 @@
+// src/components/staff/PinLogin.tsx
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { hasPermission } from '@/app/lib/constants/permissions';
 import { logAccess } from '@/app/services/access-logs';
+import { registerUserToken } from '@/app/services/tokenService';
 
 interface PinLoginProps {
   isOpen: boolean;
@@ -21,22 +23,9 @@ export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const createActiveSession = async (staffData: any, staffId: string) => {
-    try {
-      const sessionRef = collection(db, 'hotels', hotelId, 'active_sessions');
-      await addDoc(sessionRef, {
-        userId: staffId,
-        userName: staffData.name,
-        role: staffData.role,
-        accessType: 'pin',
-        active: true,
-        startedAt: new Date(),
-        lastHeartbeat: new Date()
-      });
-    } catch (error) {
-      console.error('Error creating active session:', error);
-      throw error;
-    }
+  const validatePin = (pin: string) => {
+    // Validar que el PIN tenga exactamente 10 dígitos y solo contenga números
+    return /^\d{10}$/.test(pin);
   };
 
   const handlePinSubmit = async (e: React.FormEvent) => {
@@ -45,8 +34,8 @@ export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps)
     setLoading(true);
 
     try {
-      // Validar PIN
-      if (!/^\d{10}$/.test(pin)) {
+      // Validar formato del PIN
+      if (!validatePin(pin)) {
         throw new Error('El PIN debe contener exactamente 10 dígitos numéricos');
       }
 
@@ -72,7 +61,14 @@ export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps)
         throw new Error('No tienes los permisos necesarios para acceder');
       }
 
-      // Registrar el acceso
+      // Registrar token FCM
+      const fcmToken = await registerUserToken(
+        staffDoc.id,
+        hotelId,
+        staffData.role
+      );
+
+      // Registrar acceso
       await logAccess({
         userId: staffDoc.id,
         userName: staffData.name,
@@ -82,20 +78,18 @@ export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps)
         action: 'pin_login'
       });
 
-      // Crear sesión activa
-      await createActiveSession(staffData, staffDoc.id);
-
       // Actualizar último acceso
-      await updateDoc(doc(staffRef, staffDoc.id), {
+      await updateDoc(doc(db, 'hotels', hotelId, 'staff', staffDoc.id), {
         lastLogin: new Date(),
         lastLoginType: 'pin'
       });
 
-      // Notificar éxito
+      // Notificar éxito y enviar los datos incluyendo el token FCM
       onSuccess({
         id: staffDoc.id,
         ...staffData,
-        lastAccess: new Date().toISOString()
+        lastAccess: new Date().toISOString(),
+        fcmToken
       });
       
       onClose();
