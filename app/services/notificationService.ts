@@ -1,121 +1,119 @@
 // src/services/notificationService.ts
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 
 interface NotificationPayload {
   title: string;
   body: string;
-  icon?: string;
-  tag?: string;
-  data?: {
-    url?: string;
-    [key: string]: any;
-  };
-}
-
-interface NotificationTarget {
+  type: 'maintenance' | 'housekeeping' | 'reception' | 'guest_request';
   hotelId: string;
-  userId?: string;
-  role?: string;
-  topic?: string;
+  roomId?: string;
+  roomNumber?: string;
+  priority?: 'high' | 'normal';
+  data?: Record<string, string>;
 }
 
-export async function sendNotification(
-  payload: NotificationPayload,
-  target: NotificationTarget
-) {
-  try {
-    // Guardar la notificación en Firestore
-    const notificationRef = collection(db, 'notifications');
-    const notificationDoc = await addDoc(notificationRef, {
-      ...payload,
-      ...target,
-      status: 'pending',
-      createdAt: serverTimestamp(),
-      type: 'push'
-    });
+interface NotificationToken {
+  token: string;
+  userId: string;
+  role: string;
+  platform: 'web' | 'android' | 'ios';
+  createdAt: Date;
+}
 
-    // Enviar la notificación a través de la API
-    const response = await fetch('/api/notifications/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        payload,
-        target,
-        notificationId: notificationDoc.id
-      }),
-    });
+export class NotificationService {
+  private static instance: NotificationService;
+  private fcmPublicKey = process.env.NEXT_PUBLIC_FCM_PUBLIC_KEY;
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al enviar la notificación');
+  private constructor() {}
+
+  static getInstance(): NotificationService {
+    if (!NotificationService.instance) {
+      NotificationService.instance = new NotificationService();
     }
+    return NotificationService.instance;
+  }
 
-    return await response.json();
-  } catch (error) {
-    console.error('Error en sendNotification:', error);
-    throw error;
+  async requestPermission(): Promise<boolean> {
+    try {
+      const permission = await Notification.requestPermission();
+      return permission === 'granted';
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return false;
+    }
+  }
+
+  async registerToken(token: string, userId: string, role: string): Promise<void> {
+    try {
+      const tokensRef = collection(db, 'notification_tokens');
+      const q = query(tokensRef, where('userId', '==', userId), where('token', '==', token));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        await addDoc(tokensRef, {
+          token,
+          userId,
+          role,
+          platform: 'web',
+          createdAt: Timestamp.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error registering token:', error);
+      throw error;
+    }
+  }
+
+  async sendNotification(payload: NotificationPayload): Promise<void> {
+    try {
+      const { hotelId, type, title, body, data } = payload;
+
+      // 1. Guardar la notificación en Firestore
+      const notificationsRef = collection(db, 'hotels', hotelId, 'notifications');
+      await addDoc(notificationsRef, {
+        ...payload,
+        createdAt: Timestamp.now(),
+        status: 'pending'
+      });
+
+      // 2. Enviar a través de Cloud Functions
+      const response = await fetch('/api/notifications/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error sending notification');
+      }
+    } catch (error) {
+      console.error('Error in sendNotification:', error);
+      throw error;
+    }
+  }
+
+  async getNotifications(hotelId: string, userId: string): Promise<any[]> {
+    try {
+      const notificationsRef = collection(db, 'hotels', hotelId, 'notifications');
+      const q = query(
+        notificationsRef,
+        where('recipientId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error('Error getting notifications:', error);
+      throw error;
+    }
   }
 }
 
-export async function subscribeToTopic(token: string, topic: string) {
-  try {
-    // Validar el token y el topic
-    if (!token || !topic) {
-      throw new Error('Token y topic son requeridos');
-    }
-
-    const response = await fetch('/api/notifications/subscribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        token,
-        topic
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al suscribirse al tema');
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error en subscribeToTopic:', error);
-    throw error;
-  }
-}
-
-export async function unsubscribeFromTopic(token: string, topic: string) {
-  try {
-    if (!token || !topic) {
-      throw new Error('Token y topic son requeridos');
-    }
-
-    const response = await fetch('/api/notifications/unsubscribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        token,
-        topic
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al desuscribirse del tema');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error en unsubscribeFromTopic:', error);
-    throw error;
-  }
-}
+export const notificationService = NotificationService.getInstance();

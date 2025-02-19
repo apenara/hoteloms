@@ -1,5 +1,5 @@
 // src/components/staff/PinLogin.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { db } from '@/lib/firebase/config';
 import { hasPermission } from '@/app/lib/constants/permissions';
 import { logAccess } from '@/app/services/access-logs';
 import { registerUserToken } from '@/app/services/tokenService';
+import { Checkbox } from '../ui/checkbox';
 
 interface PinLoginProps {
   isOpen: boolean;
@@ -18,14 +19,69 @@ interface PinLoginProps {
   hotelId: string;
 }
 
+interface SavedPinData {
+  pin: string;
+  hotelId: string;
+  timestamp: string;
+}
+
 export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps) {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rememberPin, setRememberPin] = useState(false);
+
+  useEffect(() => {
+    // Intentar cargar PIN guardado al abrir el diálogo
+    if (isOpen) {
+      const savedPinData = getSavedPin();
+      if (savedPinData && savedPinData.hotelId === hotelId) {
+        setPin(savedPinData.pin);
+        setRememberPin(true);
+      }
+    }
+  }, [isOpen, hotelId]);
 
   const validatePin = (pin: string) => {
     // Validar que el PIN tenga exactamente 10 dígitos y solo contenga números
     return /^\d{10}$/.test(pin);
+  };
+
+  const getSavedPin = (): SavedPinData | null => {
+    try {
+      const savedPin = localStorage.getItem('savedStaffPin');
+      if (savedPin) {
+        const pinData = JSON.parse(savedPin);
+        // Verificar si el PIN guardado tiene menos de 12 horas
+        const savedTime = new Date(pinData.timestamp).getTime();
+        const now = new Date().getTime();
+        const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+        
+        if (now - savedTime < TWELVE_HOURS) {
+          return pinData;
+        } else {
+          // Eliminar PIN guardado si ha expirado
+          localStorage.removeItem('savedStaffPin');
+        }
+      }
+    } catch (error) {
+      console.error('Error al recuperar PIN guardado:', error);
+      localStorage.removeItem('savedStaffPin');
+    }
+    return null;
+  };
+
+  const savePin = (pin: string) => {
+    try {
+      const pinData: SavedPinData = {
+        pin,
+        hotelId,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('savedStaffPin', JSON.stringify(pinData));
+    } catch (error) {
+      console.error('Error al guardar PIN:', error);
+    }
   };
 
   const handlePinSubmit = async (e: React.FormEvent) => {
@@ -60,13 +116,21 @@ export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps)
       if (!hasPermission(staffData.role, 'canChangeRoomStatus')) {
         throw new Error('No tienes los permisos necesarios para acceder');
       }
+      
+       // Guardar PIN si se seleccionó recordar
+       if (rememberPin) {
+        savePin(pin);
+      } else {
+        localStorage.removeItem('savedStaffPin');
+      }
 
       // Registrar token FCM
       const fcmToken = await registerUserToken(
-        staffDoc.id,
+        staffData.id,
         hotelId,
         staffData.role
       );
+
 
       // Registrar acceso
       await logAccess({
@@ -134,6 +198,19 @@ export function PinLogin({ isOpen, onClose, onSuccess, hotelId }: PinLoginProps)
             <p className="text-sm text-gray-500">
               Ingrese su número de documento como PIN
             </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="rememberPin"
+              checked={rememberPin}
+              onCheckedChange={(checked) => setRememberPin(checked as boolean)}
+            />
+            <label
+              htmlFor="rememberPin"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Recordar PIN por 12 horas
+            </label>
           </div>
 
           <div className="flex justify-end space-x-2">

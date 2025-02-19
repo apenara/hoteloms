@@ -7,18 +7,31 @@ import {
   getDocs, 
   addDoc, 
   deleteDoc,
-  Timestamp 
+  Timestamp, 
+  updateDoc
 } from 'firebase/firestore';
 import { requestNotificationPermission } from '@/lib/firebase/config';
 
-export async function registerUserToken(userId: string, hotelId: string, role: string) {
+interface TokenRegistrationParams {
+    userId: string;
+    hotelId: string;
+    role: string;
+    authMethod: 'email' | 'pin';
+  }
+
+export async function registerUserToken(
+  userId: string, 
+  hotelId: string, 
+  role: string,
+  authMethod: 'email' | 'pin'
+) {
   try {
-    // 1. Solicitar permiso y obtener token
     const fcmToken = await requestNotificationPermission();
     if (!fcmToken) return null;
 
-    // 2. Verificar si el token ya existe
     const tokensRef = collection(db, 'notification_tokens');
+    
+    // Verificar tokens existentes
     const q = query(
       tokensRef, 
       where('userId', '==', userId),
@@ -27,15 +40,29 @@ export async function registerUserToken(userId: string, hotelId: string, role: s
     
     const snapshot = await getDocs(q);
 
-    // Si el token no existe, crearlo
+    const tokenData = {
+      token: fcmToken,
+      userId,
+      hotelId,
+      role,
+      platform: 'web',
+      authMethod, // Agregar método de autenticación
+      createdAt: Timestamp.now(),
+      lastUsed: Timestamp.now(),
+      deviceInfo: {
+        userAgent: window.navigator.userAgent,
+        platform: window.navigator.platform
+      }
+    };
+
     if (snapshot.empty) {
-      await addDoc(tokensRef, {
-        token: fcmToken,
-        userId,
-        hotelId,
-        role,
-        platform: 'web',
-        createdAt: Timestamp.now(),
+      // Crear nuevo token
+      await addDoc(tokensRef, tokenData);
+    } else {
+      // Actualizar token existente
+      const docRef = snapshot.docs[0].ref;
+      await updateDoc(docRef, {
+        ...tokenData,
         lastUsed: Timestamp.now()
       });
     }
@@ -46,7 +73,6 @@ export async function registerUserToken(userId: string, hotelId: string, role: s
     return null;
   }
 }
-
 export async function removeUserTokens(userId: string) {
   try {
     const tokensRef = collection(db, 'notification_tokens');

@@ -72,26 +72,27 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
+  
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         loginData.email,
         loginData.password
       );
-
+  
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
       const userData = userDoc.data();
-
+  
       if (!userData) {
         throw new Error("No se encontraron datos del usuario");
       }
-
-      // Registrar token FCM
-      const fcmToken = await registerUserToken(
+  
+      // Registrar token FCM con información completa
+      await registerUserToken(
         userCredential.user.uid,
         userData.hotelId || 'admin',
-        userData.role
+        userData.role,
+        'email' // Agregar método de autenticación
       );
 
       // Redireccionar según el rol
@@ -114,11 +115,11 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
+  
     try {
       let targetHotelId = hotelId;
       let staffInfo = null;
-
+  
       if (!targetHotelId) {
         staffInfo = await handlePinSearch(pin);
         if (!staffInfo) {
@@ -126,16 +127,16 @@ export default function LoginPage() {
         }
         targetHotelId = staffInfo.hotelId;
       }
-
+  
       const staffMember = await loginWithPin(pin, targetHotelId, requiredRole);
-
-      // Registrar token FCM
-      const fcmToken = await registerUserToken(
+  
+      // Registrar token FCM con la información correcta del staff
+      await registerUserToken(
         staffMember.id,
         targetHotelId,
-        staffMember.role
+        staffMember.role,
+        'pin' // Agregar método de autenticación
       );
-
       // Construir la URL de redirección según el rol
       let redirectUrl = "";
       switch (staffMember.role) {

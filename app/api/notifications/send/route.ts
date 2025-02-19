@@ -6,27 +6,22 @@ export async function POST(request: Request) {
   try {
     const { payload, target } = await request.json();
 
+    // Validar que el payload tenga la estructura correcta
+    if (!payload || !payload.notification || !payload.notification.title || !payload.notification.body) {
+      return NextResponse.json(
+        { error: 'Payload inválido' },
+        { status: 400 }
+      );
+    }
+
     const message: admin.messaging.Message = {
       notification: {
-        title: payload.title,
-        body: payload.body,
+        title: payload.notification.title,
+        body: payload.notification.body,
       },
       data: payload.data || {},
-      android: {
-        notification: {
-          icon: 'stock_ticker_update',
-          color: '#4CAF50',
-          priority: 'high',
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            'mutable-content': 1,
-            sound: 'default',
-          },
-        },
-      },
+      token: payload.token,
+      condition: target.condition || '',
     };
 
     // Configurar el destino de la notificación

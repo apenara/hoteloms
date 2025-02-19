@@ -19,6 +19,7 @@ import { PinLogin } from '@/components/staff/PinLogin';
 import StaffLoginDialog from '@/components/staff/StaffLoginDialog';
 import { logAccess } from '@/app/services/access-logs';
 import { hasPermission } from '@/app/lib/constants/permissions';
+import { sendGuestRequestNotification } from '@/app/services/guestNotificationService';
 
 
 export default function PublicRoomView() {
@@ -177,6 +178,14 @@ export default function PublicRoomView() {
           id: room?.id
         }
       });
+
+        // Enviar notificación
+    await sendGuestRequestNotification({
+      type: newStatus,
+      hotelId: params.hotelId,
+      roomNumber: room.number,
+      roomId: params.roomId
+    });
   
       setSuccessMessage('Solicitud enviada correctamente');
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -199,6 +208,15 @@ export default function PublicRoomView() {
         createdAt: new Date(),
         type: 'guest_request'
       });
+
+       // Enviar notificación
+    await sendGuestRequestNotification({
+      type: 'guest_request',
+      hotelId: params.hotelId,
+      roomNumber: room.number,
+      roomId: params.roomId,
+      message: message.substring(0, 100) // Primeros 100 caracteres del mensaje
+    });
 
       setMessage('');
       setShowMessageDialog(false);
