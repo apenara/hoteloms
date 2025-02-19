@@ -1,9 +1,8 @@
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator  } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getAnalytics } from "firebase/analytics";
-import { getStorage, connectStorageEmulator  } from "firebase/storage";
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getApp, getApps, initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,49 +16,60 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
-// const analytics = getAnalytics(app);
 
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    user.getIdToken(true);
+// Inicializar messaging solo en el cliente
+let messaging: any = null;
+
+if (typeof window !== "undefined") {
+  try {
+    messaging = getMessaging(app);
+  } catch (error) {
+    console.error("Error initializing messaging:", error);
   }
-});
+}
 
 export async function requestNotificationPermission() {
   try {
     if (!messaging) return null;
 
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.log('Permiso de notificación denegado');
+    if (permission !== "granted") {
+      console.log("Permiso de notificación denegado");
+      return null;
+    }
+
+    // Verificar que la VAPID key esté definida
+    const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+    if (!vapidKey) {
+      console.error("VAPID key no encontrada");
       return null;
     }
 
     // Obtener token FCM
     const token = await getToken(messaging, {
-      vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY // Asegúrate de tener esta variable de entorno
+      vapidKey,
+      serviceWorkerRegistration:
+        await navigator.serviceWorker.getRegistration(),
     });
 
+    console.log("FCM Token:", token);
     return token;
   } catch (error) {
-    console.error('Error al solicitar permiso:', error);
+    console.error("Error al solicitar permiso:", error);
     return null;
   }
 }
 
-// 3. Función para manejar mensajes en primer plano
 export function onMessageListener() {
   if (!messaging) return () => {};
 
   return onMessage(messaging, (payload) => {
-    console.log('Mensaje recibido:', payload);
-    // Aquí puedes manejar la notificación como desees
-    // Por ejemplo, mostrar un toast o actualizar el UI
+    console.log("Mensaje recibido:", payload);
+    return payload;
   });
 }
 
-export { app, auth, db, storage, messaging  };
+export { app, auth, db, storage, messaging };

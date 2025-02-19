@@ -7,7 +7,7 @@ importScripts(
 );
 
 firebase.initializeApp({
-  apiKey:"AIzaSyA9XJg2fLAKgtg9URn3oH7Grc7RbT_aoDU",
+  apiKey: "AIzaSyA9XJg2fLAKgtg9URn3oH7Grc7RbT_aoDU",
   authDomain: "roomflowapp.firebaseapp.com",
   projectId: "roomflowapp",
   storageBucket: "roomflowapp.firebasestorage.app",
@@ -19,30 +19,28 @@ const messaging = firebase.messaging();
 
 // Manejo de notificaciones en segundo plano
 messaging.onBackgroundMessage((payload) => {
-  console.log('Mensaje recibido en background:', payload);
+  console.log("Mensaje recibido en background:", payload);
 
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: '/ios/192.png', // Usa tu logo de la app
-    badge: '/ios/100.png',
-    tag: payload.data?.tag || 'default',
-    data: payload.data
+    icon: "/ios/192.png", // Usa tu logo de la app
+    badge: "/ios/100.png",
+    tag: payload.data?.tag || "default",
+    data: payload.data,
   };
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  return self.registration.showNotification(
+    notificationTitle,
+    notificationOptions
+  );
 });
 
-// Manejo del clic en la notificación
-self.addEventListener('notificationclick', (event) => {
-  const notification = event.notification;
-  const action = event.action;
-  const data = notification.data;
+self.addEventListener("notificationclick", (event) => {
+  console.log("Notificación clickeada:", event);
+  event.notification.close();
 
-  notification.close();
-
-  // Ejemplo de navegación al hacer clic
-  if (data && data.url) {
-    clients.openWindow(data.url);
+  if (event.notification.data && event.notification.data.url) {
+    clients.openWindow(event.notification.data.url);
   }
 });

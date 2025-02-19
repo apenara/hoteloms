@@ -15,10 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import {
-  Search,
-  Building,
-} from "lucide-react";
+import { Search, Building } from "lucide-react";
 import { RoomCard } from "@/components/hotels/RoomCard";
 import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
 import { ROOM_STATES } from "@/app/lib/constants/room-states";
@@ -98,15 +95,6 @@ export default function HotelDashboard() {
 
   const [estadoFiltrado, setEstadoFiltrado] = useState("todos");
 
-  const updateSessionHeartbeat = async () => {
-    const sessionId = getCookie('staffAccess');
-    if (sessionId) {
-      await updateDoc(doc(db, 'hotels', hotelId, 'active_sessions', sessionId), {
-        lastHeartbeat: serverTimestamp()
-      });
-    }
-  };
-
   const habitacionesFiltradas = useMemo(() => {
     // Primero filtramos las habitaciones
     const habitacionesFiltradas = habitaciones.filter((habitacion) => {
@@ -124,8 +112,8 @@ export default function HotelDashboard() {
     // Luego ordenamos las habitaciones
     return habitacionesFiltradas.sort((a, b) => {
       // Convertimos los números de habitación a enteros para comparación numérica
-      const numA = parseInt(a.number.replace(/\D/g, ''));
-      const numB = parseInt(b.number.replace(/\D/g, ''));
+      const numA = parseInt(a.number.replace(/\D/g, ""));
+      const numB = parseInt(b.number.replace(/\D/g, ""));
       return numA - numB;
     });
   }, [habitaciones, pisoSeleccionado, busqueda, estadoFiltrado]);
@@ -181,7 +169,6 @@ export default function HotelDashboard() {
               </Select>
             </div>
           </div>
-                  <div className="flex flex-col sm:flex-row gap-4 mb-4"><AuthMonitor></AuthMonitor></div>
           {/* Contadores de estado */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
             <Card

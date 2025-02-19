@@ -6,10 +6,9 @@
   "display": "standalone",
   "orientation": "any",
   "scope": "/",
+  "gcm_sender_id": "103953800507",
   "start_url": "/auth/login",
-  "permissions": [
-    "camera"
-  ],
+  "permissions": ["camera"],
   "icons": [
     {
       "src": "windows11/SmallTile.scale-100.png",
