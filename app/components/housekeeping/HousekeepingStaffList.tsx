@@ -20,7 +20,7 @@ const getTiempoEsperado = (tipo: string): number => {
     cleaning_checkout: 45,
     cleaning_occupied: 30,
     cleaning_touch: 15,
-    default: 30,
+    default: 30, 
   };
   return tiempos[tipo as keyof typeof tiempos] || tiempos.default;
 };

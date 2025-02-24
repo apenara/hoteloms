@@ -21,7 +21,7 @@ interface HousekeepingStatsProps {
   camareras: Staff[];
   habitaciones: Room[];
   estadisticasGlobales: any;
-}
+} 
 
 export function HousekeepingStats({
   camareras,

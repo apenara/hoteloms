@@ -13,7 +13,7 @@ interface NotificationsDialogProps {
 export function NotificationsDialog({ hotelId }: NotificationsDialogProps) {
   const { unreadCount } = useReceptionNotifications(hotelId);
 
-  return (
+  return ( 
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" size="icon" className="relative">

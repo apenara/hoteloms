@@ -1,5 +1,5 @@
 // src/services/guestNotificationService.ts
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 const NOTIFICATION_TYPES = {
@@ -25,13 +25,21 @@ const NOTIFICATION_TYPES = {
   }
 };
 
+interface SendGuestRequestNotificationProps {
+  type: string;
+  hotelId: string;
+  roomNumber: string;
+  roomId: string;
+  message?: string;
+}
+
 export async function sendGuestRequestNotification({
   type,
   hotelId,
   roomNumber,
   roomId,
   message = ''
-}) {
+}: SendGuestRequestNotificationProps) {
   try {
     const notificationConfig = NOTIFICATION_TYPES[type];
     if (!notificationConfig) {
@@ -45,14 +53,19 @@ export async function sendGuestRequestNotification({
       where('hotelId', '==', hotelId),
       where('role', '==', notificationConfig.role)
     );
-    
+
     const snapshot = await getDocs(q);
     const tokens = snapshot.docs.map(doc => doc.data().token);
+    const timestamp = Timestamp.now();
 
     if (tokens.length === 0) {
       console.log('No hay tokens disponibles para notificar');
-      return;
     }
+
+    //Get all the users with the notification config role
+    const staffRef = collection(db, 'hotels', hotelId, 'staff');
+    const staffQuery = query(staffRef, where('role', '==', notificationConfig.role));
+    const staffSnapshot = await getDocs(staffQuery);
 
     // 2. Preparar el payload de la notificación
     const payload = {
@@ -70,8 +83,28 @@ export async function sendGuestRequestNotification({
       },
       tokens
     };
+    
+    // 3. save notifications in the database.
+    const notificationsRef = collection(db, 'hotels', hotelId, 'notifications');
+    const notificationPromises = staffSnapshot.docs.map(async (doc) => {
+      const staffMember = doc.data();
+      await addDoc(notificationsRef, {
+        type: type,
+        message: message ? message: `Nueva solicitud de ${type} - Habitación ${roomNumber}`, // Default message
+        roomId: roomId,
+        roomNumber: roomNumber,
+        timestamp: timestamp,
+        status: 'unread',
+        priority: type === 'need_cleaning' ? 'high' : 'normal',
+        targetRole: notificationConfig.role,
+        targetStaffId: staffMember.id, // Add specific staff member id
+        createdAt: timestamp,
+        alertLevel: 0, // Set initial alert level
+      });
+    });
+    await Promise.all(notificationPromises);
 
-    // 3. Enviar la notificación
+    // 4. Send the notification
     const response = await fetch('/api/notifications/send', {
       method: 'POST',
       headers: {

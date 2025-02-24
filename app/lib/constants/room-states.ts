@@ -116,7 +116,7 @@ export const ROOM_STATES = {
   'ready_for_inspection': {
     label: 'Lista para Inspección',
     icon: ClipboardCheck,
-    color: 'bg-blue-100 text-blue-800',
+    color: 'bg-blue-100 text-blue-800', 
     group: 'cleaning',
     requiresInspection: true,
     notifyGroup: 'supervisor'
@@ -195,5 +195,39 @@ export const ROLE_PERMISSIONS = {
   maintenance: {
     canView: ['maintenance'],
     canModify: ['maintenance', 'available']
+  }
+} as const;
+
+// New constant for state change notifications
+export const STATE_NOTIFICATIONS = {
+  'in_house': {
+    message: 'Habitación {roomNumber} se marcó como In House',
+    priority: 'high',
+    targetRole: 'housekeeping' // Changed from 'reception' to 'housekeeping'
+  },
+  'checkout': {
+    message: 'Habitación {roomNumber} Check-out',
+    priority: 'normal',
+    targetRole: 'housekeeping'
+  },
+  'maintenance': {
+    message: 'Habitación {roomNumber} necesita mantenimiento',
+    priority: 'high',
+    targetRole: 'maintenance'
+  },
+  'available': {
+    message: 'Habitación {roomNumber} ahora disponible',
+    priority: 'normal',
+    targetRole: ['reception', 'housekeeper']
+  },
+  'need_cleaning':{
+    message: 'Habitación {roomNumber} necesita limpieza',
+    priority: 'high',
+    targetRole: 'housekeeper'
+  },
+  'ready_for_inspection':{
+    message: 'Habitación {roomNumber} lista para inspección',
+    priority: 'normal',
+    targetRole: 'supervisor'
   }
 } as const;

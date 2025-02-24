@@ -1,3 +1,5 @@
+//esta es la pagina publica de la habitacion, es decir la que ve el huesped, solo debe poder enviar solicitudes a recepcion y ver el estado de la habitacion
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -213,7 +215,7 @@ export default function PublicRoomView() {
     await sendGuestRequestNotification({
       type: 'guest_request',
       hotelId: params.hotelId,
-      roomNumber: room.number,
+      roomNumber: room.number, 
       roomId: params.roomId,
       message: message.substring(0, 100) // Primeros 100 caracteres del mensaje
     });

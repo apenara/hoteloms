@@ -4,46 +4,68 @@ import { admin } from '@/lib/firebase/admin-config';
 
 export async function POST(request: Request) {
   try {
-    const { payload, target } = await request.json();
+    const { notification, data, tokens } = await request.json();
 
-    // Validar que el payload tenga la estructura correcta
-    if (!payload || !payload.notification || !payload.notification.title || !payload.notification.body) {
+    // Validate the payload
+    if (!notification || !notification.title || !notification.body) {
       return NextResponse.json(
-        { error: 'Payload inválido' },
+        { error: 'Invalid payload: Missing notification title or body' },
         { status: 400 }
       );
     }
 
-    const message: admin.messaging.Message = {
-      notification: {
-        title: payload.notification.title,
-        body: payload.notification.body,
-      },
-      data: payload.data || {},
-      token: payload.token,
-      condition: target.condition || '',
-    };
-  
-    // Configurar el destino de la notificación
-    if (target.topic) {
-      message.topic = target.topic;
-    } else if (target.token) {
-      message.token = target.token;
-    } else {
-      // Si no hay topic ni token, enviar a un topic basado en el hotelId
-      message.topic = `hotel_${target.hotelId}`;
+    if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid payload: Missing or empty tokens array' },
+        { status: 400 }
+      );
     }
 
-    // Enviar la notificación
-    const response = await admin.messaging().send(message);
+    const message = {
+        notification: {
+          title: notification.title,
+          body: notification.body,
+        },
+        data: data || {},
+      };
 
-    return NextResponse.json({ success: true, messageId: response });
+    const response = await admin.messaging().sendEachForMulticast({
+        tokens,
+        ...message,
+    });
+
+    // Check for failures
+    const failedTokens: string[] = [];
+    response.responses.forEach((resp, idx) => {
+      if (!resp.success) {
+        console.error(
+          `Error sending to token ${tokens[idx]}:`,
+          resp.error
+        );
+        failedTokens.push(tokens[idx]);
+      }
+    });
+
+    if (failedTokens.length > 0) {
+      console.error(`Failed to send to ${failedTokens.length} tokens`);
+    }
+
+    return NextResponse.json({
+      success: true,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      failedTokens,
+    });
   } catch (error) {
     console.error('Error sending notification:', error);
-    return NextResponse.json(
-      { error: 'Error sending notification' },
-      { status: 500 }
-    );
+
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    } else {
+      return NextResponse.json(
+        { error: 'An unexpected error occurred' },
+        { status: 500 }
+      );
+    }
   }
 }
-

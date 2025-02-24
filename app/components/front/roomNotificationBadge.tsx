@@ -12,7 +12,7 @@ export default function RoomNotificationBadge() {
         setIsVisible(prev => !prev);
       }, 2000);
 
-      return () => clearInterval(timer);
+      return () => clearInterval(timer); 
     }, []);
 
     return (

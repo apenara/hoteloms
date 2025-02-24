@@ -16,7 +16,7 @@ import {
   Clock,
   Home,
   AlertTriangle,
-  TrendingUp,
+  TrendingUp, 
   Timer,
   ClipboardList,
 } from "lucide-react";

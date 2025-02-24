@@ -1,3 +1,5 @@
+//este es el dashboard de recepcionista, aqui es cuadro de control de la operacion y los estados de las habiraciones
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -33,7 +35,7 @@ export default function ReceptionStaffPage() {
   const [rooms, setRooms] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');

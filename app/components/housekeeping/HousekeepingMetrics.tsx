@@ -21,7 +21,7 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
+  Cell, 
 } from "recharts";
 import type { Staff, Room } from "@/app/lib/types";
 import {

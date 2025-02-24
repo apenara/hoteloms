@@ -21,7 +21,7 @@ interface HousekeepingStats {
   estadisticasGlobales: EstadisticasGlobales;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-}
+} 
 
 const TABS = [
   {

@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
 } from "@/app/components/ui/dialog";
 import {
   DropdownMenu,
@@ -27,6 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RoomProgressTimer } from '../hotels/RoomProgressTimer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { RoomHistory } from './RoomHistory';
+import RoomNotificationBadge from './roomNotificationBadge';
 
 interface ReceptionRoomCardProps {
   room: {
@@ -49,6 +49,7 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
   const [isLoading, setIsLoading] = useState(false);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [isNewRequest, setIsNewRequest] = useState(false);
+  const [roomUnreadNotifications, setRoomUnreadNotifications] = useState<number>(0);
 
   const statusInfo = ROOM_STATES[room.status] || ROOM_STATES.available;
   const allowedTransitions = ROLE_STATE_FLOWS.reception[room.status] || [];
@@ -75,10 +76,6 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           setIsNewRequest(true);
-          // Reproducir sonido de notificación
-          // const audio = new Audio('/notification-sound.mp3');
-          // audio.play().catch(e => console.log('Error playing sound:', e));
-          // Resetear el indicador después de 5 segundos
           setTimeout(() => setIsNewRequest(false), 5000);
         }
       });
@@ -86,6 +83,24 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
 
     return () => unsubscribe();
   }, [hotelId, room.id]);
+
+  // Suscripción a las notificaciones de la habitación
+  useEffect(() => {
+    const notificationsRef = collection(db, 'hotels', hotelId, 'notifications');
+    const notificationsQuery = query(
+      notificationsRef,
+      where('roomId', '==', room.id),
+      where('status', '==', 'unread'),
+      where('targetStaffId', '==', currentUser.id)
+    );
+
+    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+      const unreadNotifications = snapshot.size;
+      setRoomUnreadNotifications(unreadNotifications);
+    });
+
+    return () => unsubscribe();
+  }, [hotelId, room.id, currentUser.id]);
 
   const handleStateChange = async (newStatus: string) => {
     if (isLoading) return;
@@ -119,20 +134,6 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
         userName: currentUser.name,
         userRole: 'reception'
       });
-
-      if (newStatus === 'in_house' || newStatus === 'checkout') {
-        await addDoc(collection(db, 'hotels', hotelId, 'notifications'), {
-          type: 'status_change',
-          roomId: room.id,
-          roomNumber: room.number,
-          status: newStatus,
-          timestamp,
-          priority: newStatus === 'in_house' ? 'high' : 'normal',
-          targetRole: 'housekeeping',
-          read: false
-        });
-      }
-
     } catch (error) {
       console.error('Error updating room status:', error);
     } finally {
@@ -174,6 +175,7 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
   return (
     <div className="relative">
       {/* Indicador de notificación */}
+      <RoomNotificationBadge isVisible={roomUnreadNotifications > 0} />
       <AnimatePresence>
         {pendingRequests.length > 0 && (
           <motion.div

@@ -65,7 +65,8 @@ export default function ReceptionView() {
       const notificationsQuery = query(
         notificationsRef,
         where('status', '==', 'unread'),
-        where('targetRole', '==', 'reception')
+        where('targetRole', '==', 'reception'),
+        where('targetStaffId', '==', staff.id) // New line
       );
 
       const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
@@ -85,7 +86,7 @@ export default function ReceptionView() {
       setError('Error al cargar los datos');
       setLoading(false);
     }
-  }, [staff?.hotelId]);
+  }, [staff?.hotelId, staff?.id]); // Add staff.id to dependency array
 
   // Calcular pisos únicos
   const uniqueFloors = useMemo(() => {
