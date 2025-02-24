@@ -5,11 +5,11 @@ import { useNotifications } from "./hooks/useNotifications";
 import { useToast } from "./hooks/use-toast";
 
 export default function ClientLayout({
-  children,
+  children, 
 }: {
   children: React.ReactNode;
 }) {
-  const { requestPermission, notification } = useNotifications();
+  const { token, notificationPermission } = useNotifications(); // Ahora solo desestructuramos token y notificationPermission
   const { toast } = useToast();
 
   useEffect(() => {
@@ -24,19 +24,7 @@ export default function ClientLayout({
           console.error("Error registrando Service Worker:", error);
         });
     }
-
-    // Solicitar permiso de notificaciones
-    requestPermission();
   }, []);
-
-  useEffect(() => {
-    if (notification) {
-      toast({
-        title: notification.title,
-        description: notification.body,
-      });
-    }
-  }, [notification]);
 
   return <>{children}</>;
 }

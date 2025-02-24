@@ -56,6 +56,14 @@ export const ROOM_STATES = {
     autoTransition: 'need_cleaning',
     notifyGroup: 'housekeeping'
   },
+  'checkout_today': {
+    label: 'Check Out Hoy',
+    icon: Clock,
+    color: 'bg-orange-100 text-orange-800',
+    group: 'reception',
+    autoTransition: 'need_cleaning',
+    notifyGroup: 'housekeeping'
+  },
   'blocked_maintenance': {
     label: 'Bloqueada por Mantenimiento',
     icon: AlertTriangle,
@@ -141,7 +149,8 @@ export type RoomStatus = keyof typeof ROOM_STATES;
 export const ROLE_STATE_FLOWS = {
   reception: {
     'available': ['occupied'],
-    'occupied': ['checkout', 'occupied_maintenance'],
+    'occupied': ['checkout', 'occupied_maintenance', 'checkout_today'],
+    'checkout_today': ['checkout', 'available'],
     'occupied_maintenance': ['checkout'],
     'clean_occupied': ['checkout'],
     'checkout': ['in_house', 'available'],

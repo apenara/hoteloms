@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       token: payload.token,
       condition: target.condition || '',
     };
-
+  
     // Configurar el destino de la notificación
     if (target.topic) {
       message.topic = target.topic;

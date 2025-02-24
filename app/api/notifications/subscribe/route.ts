@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     if (!/^[a-zA-Z0-9_-]+$/.test(topic)) {
       return NextResponse.json(
         { error: 'Topic inválido' },
-        { status: 400 }
+        { status: 400 }  
       );
     }
 

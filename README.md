@@ -1,280 +1,312 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistema de Gestión Hotelera HotelOMS
+## 1. Arquitectura General
 
-## Getting Started
+### 1.1 Niveles de Acceso
+- **Nivel 1 (Administrativo)**
+  - Super Admin: Gestión global del sistema
+  - Hotel Admin: Administración de un hotel específico
+  - Supervisor: Supervisión de operaciones
 
-First, run the development server:
+- **Nivel 2 (Operativo)**
+  - Housekeeping: Personal de limpieza
+  - Mantenimiento: Personal técnico
+  - Recepción: Personal de front desk
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 1.2 Módulos Principales
+- Gestión de Estados de Habitaciones
+- Sistema de Logs y Trazabilidad
+- Control de Inventario y Mantenimientos
+- Portal de Solicitudes para Huéspedes
+- Gestión de Personal
+- Dashboard Administrativo
+
+## 2. Flujos de Trabajo
+
+### 2.1 Gestión de Estados de Habitaciones
+
+#### Estados Básicos
+- Disponible → Ocupada → Check-out
+- En Casa (In House)
+- No Molestar (Do Not Disturb)
+
+#### Flujo de Limpieza
+1. Necesita Limpieza
+2. Limpieza Ocupada/Check-out/Retoque
+3. Inspección (si se requiere)
+4. Disponible
+
+#### Flujo de Mantenimiento
+1. Solicitud de Mantenimiento
+2. Asignación de Personal
+3. En Progreso
+4. Completado
+5. Verificación
+6. Retorno a Estado Disponible
+
+### 2.2 Sistema de Autenticación
+
+#### Personal Administrativo
+- Acceso por email/contraseña
+- Roles y permisos específicos
+- Sesiones prolongadas
+
+#### Personal Operativo
+- Acceso por PIN de 10 dígitos
+- Autenticación simplificada
+- Sesiones de 8 horas
+- Acceso a funciones específicas según rol
+
+### 2.3 Gestión de Solicitudes
+
+#### Tipos de Solicitudes
+- Limpieza
+- Mantenimiento
+- Servicio a la habitación
+- No molestar
+
+#### Flujo de Solicitudes
+1. Creación (huésped o personal)
+2. Asignación
+3. En proceso
+4. Completada
+5. Verificación (opcional)
+
+## 3. Reglas de Negocio
+
+### 3.1 Estados de Habitaciones
+- Cada cambio de estado genera un registro en el historial
+- Los estados requieren notas o justificación
+- Ciertos estados requieren inspección antes de cambiar a disponible
+- Solo roles específicos pueden realizar ciertos cambios de estado
+
+### 3.2 Personal
+- Cada miembro del personal tiene un rol específico
+- Los permisos están basados en roles
+- Se registra cada acción del personal
+- El personal operativo puede usar PIN o email
+- Se mantiene historial de eficiencia y tiempos
+
+### 3.3 Mantenimiento
+- Las solicitudes tienen prioridades (alta, media, baja)
+- Se pueden adjuntar imágenes a las solicitudes
+- Se requieren notas de completación
+- Se calculan métricas de tiempo de respuesta
+
+## 4. Integraciones
+
+### 4.1 Firebase
+- Authentication: Gestión de usuarios
+- Firestore: Base de datos principal
+- Storage: Almacenamiento de imágenes
+- Real-time updates: Actualizaciones en vivo
+
+### 4.2 Características PWA
+- Instalable como aplicación
+- Funcionamiento offline
+- Notificaciones push
+- Acceso a cámara para fotos
+
+## 5. Métricas y KPIs
+
+### 5.1 Housekeeping
+- Tiempo promedio de limpieza
+- Eficiencia por personal
+- Tasa de aprobación de inspecciones
+- Tiempo de respuesta a solicitudes
+
+### 5.2 Mantenimiento
+- Tiempo de resolución
+- Tasa de reincidencia
+- Solicitudes por tipo
+- Eficiencia por técnico
+
+### 5.3 Operaciones
+- Ocupación
+- Tiempo de check-in/check-out
+- Satisfacción del huésped
+- Tiempo de respuesta general
+
+
+# Arquitectura Técnica de HotelOMS
+
+## 1. Archivos Clave del Sistema
+
+### Configuración y Middleware
+- `middleware.ts`: Control de rutas y autenticación
+  - Maneja niveles de acceso (LEVEL_1_ROUTES, LEVEL_2_ROUTES)
+  - Verifica tokens (authToken, staffAccess, firebaseToken)
+  - Controla sesiones y expiración
+  - Protege rutas según nivel de autorización
+
+### Gestión de Usuarios y Autenticación
+- `user-management.ts`: 
+  - Creación de usuarios (email y PIN)
+  - Gestión de personal
+  - Manejo de roles y permisos
+
+### Sistema de Permisos
+- `permissions.ts`:
+```typescript
+export const ROLE_PERMISSIONS = {
+  super_admin: {
+    canAccessDashboard: true,
+    canManageHotels: true,
+    canManageSubscriptions: true,
+    // ...
+  },
+  hotel_admin: {
+    canManageStaff: true,
+    canManageRooms: true,
+    // ...
+  },
+  // ...
+}
+
+export const STAFF_PERMISSIONS = {
+  housekeeper: {
+    canChangeRoomStatus: true,
+    allowedStatuses: ['cleaning_occupied', 'cleaning_checkout', ...]
+  },
+  maintenance: {
+    canChangeRoomStatus: true,
+    allowedStatuses: ['maintenance', 'available']
+  },
+  // ...
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Estados y Flujos
+- `room-states.ts`:
+```typescript
+export const ROOM_STATES = {
+  'available': {
+    label: 'Disponible',
+    icon: CheckCircle,
+    color: 'bg-emerald-100 text-emerald-800',
+    group: 'reception'
+  },
+  // ...
+}
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+export const ROLE_STATE_FLOWS = {
+  reception: {
+    'available': ['occupied'],
+    'occupied': ['checkout'],
+    // ...
+  },
+  housekeeper: {
+    'need_cleaning': ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'],
+    // ...
+  }
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 2. Servicios Principales
 
-## Learn More
+### Mantenimiento
+- `maintenanceService.ts`:
+  - Creación de solicitudes
+  - Actualización de estados
+  - Gestión de completación
+  - Estadísticas y métricas
 
-To learn more about Next.js, take a look at the following resources:
+### Estados de Habitaciones
+- `roomStateService.ts`:
+  - Actualización de estados
+  - Registro de historial
+  - Manejo de transiciones
+  - Validación de permisos
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Housekeeping
+- `useRealTimeHousekeeping.ts`:
+  - Monitoreo en tiempo real
+  - Estadísticas de limpieza
+  - Asignación de personal
+  - Métricas de eficiencia
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 3. Componentes React Clave
 
-## Deploy on Vercel
+### Autenticación de Personal
+- `PinLogin.tsx`: Login con PIN
+- `StaffLoginDialog.tsx`: Login con email
+- `AddStaffDialog.tsx`: Gestión de personal
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Mantenimiento
+- `MaintenanceDialog.tsx`: Solicitudes
+- `MaintenanceStaffView.tsx`: Vista de personal
+- `ImageUpload.tsx`: Subida de imágenes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Notificaciones
+- `NotificationsDialog.tsx`: Sistema de notificaciones
+- `RequestNotifications.tsx`: Gestión de solicitudes
 
+## 4. Estructura de Base de Datos (Firestore)
 
 ```
-hoteloms
-├─ (inicio)
-│  ├─ 404.html
-│  └─ index.html
-├─ .firebase
-│  ├─ hosting.cHVibGlj.cache
-│  ├─ hosting.KGluaWNpbyk.cache
-│  ├─ hosting.YXBw.cache
-│  └─ logs
-│     └─ vsce-debug.log
-├─ .firebaserc
-├─ .git
-│  ├─ COMMIT_EDITMSG
-│  ├─ config
-│  ├─ description
-│  ├─ FETCH_HEAD
-│  ├─ gitk.cache
-│  ├─ HEAD
-│  ├─ hooks
-│  │  ├─ applypatch-msg.sample
-│  │  ├─ commit-msg.sample
-│  │  ├─ fsmonitor-watchman.sample
-│  │  ├─ post-update.sample
-│  │  ├─ pre-applypatch.sample
-│  │  ├─ pre-commit.sample
-│  │  ├─ pre-merge-commit.sample
-│  │  ├─ pre-push.sample
-│  │  ├─ pre-rebase.sample
-│  │  ├─ pre-receive.sample
-│  │  ├─ prepare-commit-msg.sample
-│  │  ├─ push-to-checkout.sample
-│  │  ├─ sendemail-validate.sample
-│  │  └─ update.sample
-│  ├─ index
-│  ├─ info
-│  │  └─ exclude
-│  ├─ logs
-│  │  ├─ HEAD
-│  │  └─ refs
-│  │     ├─ heads
-│  │     │  ├─ master
-│  │     │  └─ ultimoMantenimientoFuncionando
-│  │     └─ remotes
-│  │        └─ hoteloms
-│  │           ├─ main
-│  │           ├─ master
-│  │           └─ version-01
-├─ app
-│  ├─ (administrativo)
-│  │  ├─ hotel-admin
-│  │  │  ├─ dashboard
-│  │  │  │  └─ page.tsx
-│  │  │  ├─ housekeeping
-│  │  │  │  └─ page.tsx
-│  │  │  ├─ maintenance
-│  │  │  │  └─ page.tsx
-│  │  │  ├─ qr-manager
-│  │  │  │  └─ page.tsx
-│  │  │  ├─ rooms
-│  │  │  │  └─ page.tsx
-│  │  │  ├─ settings
-│  │  │  │  └─ page.tsx
-│  │  │  └─ staff
-│  │  │     └─ page.tsx
-│  │  └─ layout.tsx
-│  ├─ (inicio)
-│  │  ├─ auth
-│  │  │  ├─ login
-│  │  │  │  └─ page.tsx
-│  │  │  └─ register
-│  │  │     └─ page.tsx
-│  │  ├─ contact
-│  │  │  └─ page.tsx
-│  │  ├─ features
-│  │  │  └─ page.tsx
-│  │  ├─ layout.tsx
-│  │  ├─ page.tsx
-│  │  └─ pricing
-│  │     └─ page.tsx
-│  ├─ (publico)
-│  │  ├─ maintenance
-│  │  │  └─ [hotelId]
-│  │  │     ├─ login
-│  │  │     │  └─ page.tsx
-│  │  │     └─ staff
-│  │  │        └─ page.tsx
-│  │  ├─ reception
-│  │  │  └─ [hotelId]
-│  │  │     ├─ login
-│  │  │     │  └─ page.tsx
-│  │  │     └─ staff
-│  │  │        └─ page.tsx
-│  │  └─ rooms
-│  │     └─ [hotelId]
-│  │        └─ [roomId]
-│  │           ├─ page.tsx
-│  │           └─ staff
-│  │              └─ page.tsx
-│  ├─ (superAdm)
-│  │  ├─ admin
-│  │  │  ├─ dashboard
-│  │  │  │  └─ page.tsx
-│  │  │  ├─ hotels
-│  │  │  │  ├─ page.tsx
-│  │  │  │  └─ [hotelId]
-│  │  │  │     ├─ rooms
-│  │  │  │     │  └─ page.tsx
-│  │  │  │     └─ status
-│  │  │  │        └─ page.tsx
-│  │  │  └─ users
-│  │  │     └─ page.tsx
-│  │  └─ layout.tsx
-│  ├─ api
-│  │  └─ auth
-│  │     └─ create-staff-token
-│  ├─ components
-│  │  ├─ dashboard
-│  │  │  ├─ NotificationsDialog.tsx
-│  │  │  └─ RequestNotifications.tsx
-│  │  ├─ front
-│  │  │  ├─ receptionNotifications.tsx
-│  │  │  ├─ receptionRoomCard.tsx
-│  │  │  └─ receptionView.tsx
-│  │  ├─ home
-│  │  │  ├─ Features.tsx
-│  │  │  ├─ Hero.tsx
-│  │  │  └─ Pricing.tsx
-│  │  ├─ hotels
-│  │  │  ├─ hotel-form-dialog.tsx
-│  │  │  ├─ RequestCard.tsx
-│  │  │  ├─ room-form-dialog.tsx
-│  │  │  ├─ room-status-manager.tsx
-│  │  │  ├─ RoomCard.tsx
-│  │  │  ├─ RoomDetailDialog.tsx
-│  │  │  └─ RoomStatusMenu.tsx
-│  │  ├─ housekeeping
-│  │  │  ├─ HousekeepingEfficiencyView.tsx
-│  │  │  ├─ HousekeepingHistory.tsx
-│  │  │  ├─ HousekeepingMetrics.tsx
-│  │  │  ├─ HousekeepingStaffList.tsx
-│  │  │  ├─ HousekeepingStats.tsx
-│  │  │  └─ QRLogin.tsx
-│  │  ├─ layout
-│  │  │  ├─ Footer.tsx
-│  │  │  └─ Navbar.tsx
-│  │  ├─ maintenance
-│  │  │  ├─ MaintenanceDialog.tsx
-│  │  │  ├─ MaintenanceFormDialog.tsx
-│  │  │  ├─ MaintenanceList.tsx
-│  │  │  ├─ MaintenancePreview.tsx
-│  │  │  ├─ MaintenanceReport.tsx
-│  │  │  ├─ MaintenanceRequestCard.tsx
-│  │  │  ├─ MaintenanceStaffView.tsx
-│  │  │  ├─ MaintenanceStats.tsx
-│  │  │  └─ StaffEfficiencyView.tsx
-│  │  ├─ qr
-│  │  │  └─ QrDownloadManager.tsx
-│  │  ├─ shared
-│  │  │  └─ ErrorDialog.tsx
-│  │  ├─ staff
-│  │  │  ├─ AddStaffDialog.tsx
-│  │  │  ├─ createStaffMember.tsx
-│  │  │  ├─ PinLogin.tsx
-│  │  │  ├─ PinManagement.tsx
-│  │  │  └─ StaffLoginDialog.tsx
-│  │  └─ ui
-│  │     ├─ alert-dialog.tsx
-│  │     ├─ alert.tsx
-│  │     ├─ badge.tsx
-│  │     ├─ button.tsx
-│  │     ├─ calendar.tsx
-│  │     ├─ card.tsx
-│  │     ├─ checkbox.tsx
-│  │     ├─ dialog.tsx
-│  │     ├─ dropdown-menu.tsx
-│  │     ├─ input.tsx
-│  │     ├─ label.tsx
-│  │     ├─ popover.tsx
-│  │     ├─ progress.tsx
-│  │     ├─ scroll-area.tsx
-│  │     ├─ select.tsx
-│  │     ├─ table.tsx
-│  │     ├─ tabs.tsx
-│  │     ├─ textarea.tsx
-│  │     ├─ toast.tsx
-│  │     ├─ toaster.tsx
-│  │     └─ tooltip.tsx
-│  ├─ favicon.ico
-│  ├─ hooks
-│  │  ├─ use-toast.ts
-│  │  ├─ useRealTimeHousekeeping.ts
-│  │  └─ useReception.ts
-│  ├─ index.html
-│  ├─ layout.tsx
-│  ├─ lib
-│  │  ├─ constants
-│  │  │  ├─ permissions.ts
-│  │  │  └─ room-states.ts
-│  │  ├─ types
-│  │  │  ├─ housekeeping.ts
-│  │  │  └─ reception.ts
-│  │  ├─ types.ts
-│  │  ├─ utils
-│  │  │  └─ housekeeping.ts
-│  │  └─ utils.ts
-│  ├─ services
-│  │  ├─ access-logs.ts
-│  │  ├─ housekeeping-assignment.ts
-│  │  ├─ housekeeping.ts
-│  │  ├─ maintenanceService.ts
-│  │  ├─ receptionNotificationsService.ts
-│  │  ├─ receptionService.ts
-│  │  └─ roomStateService.ts
-│  └─ ui
-│     └─ globals.css
-├─ apphosting.yaml
-├─ components.json
-├─ eslint.config.mjs
-├─ firebase.json
-├─ lib
-│  ├─ auth.js
-│  ├─ firebase
-│  │  ├─ auth.ts
-│  │  ├─ config.ts
-│  │  └─ user-management.ts
-│  ├─ types.ts
-│  └─ utils.ts
-├─ middleware.ts
-├─ next.config.js
-├─ package-lock.json
-├─ package.json
-├─ postcss.config.mjs
-├─ README.md
-├─ tailwind.config.ts
-└─ tsconfig.json
+hotels/
+  ├─ {hotelId}/
+  │  ├─ rooms/
+  │  │  ├─ {roomId}/
+  │  │  │  ├─ history/
+  │  │  │  └─ requests/
+  │  ├─ staff/
+  │  ├─ maintenance/
+  │  └─ requests/
+users/
+  └─ {userId}/
+```
 
+## 5. Mecanismos de Seguridad
+
+### Validación de Acceso
+```typescript
+// Ejemplo de middleware.ts
+export async function middleware(request: NextRequest) {
+  const authToken = request.cookies.get('authToken')?.value;
+  const staffAccess = request.cookies.get('staffAccess')?.value;
+
+  if (LEVEL_1_ROUTES.some(route => pathname.startsWith(route))) {
+    if (!authToken) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+  // ...
+}
 ```
+
+### Control de Permisos
+```typescript
+// Ejemplo de uso de permisos
+export function hasPermission(
+  role: UserRole | StaffRole,
+  permission: string
+): boolean {
+  if (role in ROLE_PERMISSIONS) {
+    return ROLE_PERMISSIONS[role][permission] || false;
+  }
+  if (role in STAFF_PERMISSIONS) {
+    return STAFF_PERMISSIONS[role][permission] || false;
+  }
+  return false;
+}
 ```
+
+## 6. Integración Firebase
+
+### Configuración
+- Authentication: Email y PIN
+- Firestore: Base de datos principal
+- Storage: Imágenes y archivos
+- Real-time updates: Suscripciones y listeners
+
+### Seguridad
+- Reglas de Firestore para control de acceso
+- Validación de tokens
+- Manejo de sesiones
+- Encriptación de datos sensibles
+
+
+ESTRUCUTRA DE ARCHIVOS :
 hoteloms
 ├─ (inicio)
 │  ├─ 404.html

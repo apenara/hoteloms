@@ -4,7 +4,7 @@ import { Inter } from "next/font/google";
 import { AuthProvider } from "@/lib/auth";
 import ClientLayout from "./ClientLayout";
 // import { NotificationProvider } from "./components/providers/NotificationProvider";
-// import { Toaster } from "./components/ui/toaster";
+import { Toaster } from "./components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,16 +22,21 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
 };
+
+
 export default function RootLayout({
+  
   children,
 }: {
+  
   children: React.ReactNode;
-}) {
+}) {  
   return (
     <html lang="es">
       <body className={`${inter.className} antialiased`}>
         <AuthProvider>
           <ClientLayout>{children}</ClientLayout>{" "}
+          <Toaster />
         </AuthProvider>
       </body>
     </html>
