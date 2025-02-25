@@ -13,31 +13,51 @@ const validateSession = () => {
 
 export async function uploadMaintenanceImages(
   hotelId: string,
+  roomId: string,
   maintenanceId: string,
   files: File[]
 ): Promise<string[]> {
   try {
-    // Validar sesión activa
-    const staffSession = validateSession();
-    if (!staffSession.hotelId || staffSession.hotelId !== hotelId) {
-      throw new Error('No tiene autorización para subir archivos en este hotel');
+    // Validar datos
+    if (!hotelId || !roomId || !maintenanceId) {
+      console.error('Datos incompletos para subir imágenes', { hotelId, roomId, maintenanceId });
+      throw new Error('Datos incompletos para subir imágenes');
     }
-
-    const uploadPromises = files.map(async (file) => {
+    
+    if (!files.length) {
+      console.log('No hay archivos para subir');
+      return [];
+    }
+    
+    console.log(`Preparando para subir ${files.length} imágenes`);
+    
+    // Validar sesión activa (opcional, dependiendo de tu implementación)
+    const staffSession = sessionStorage.getItem('currentStaffSession');
+    if (!staffSession) {
+      console.warn('No hay una sesión activa de personal');
+      // Dependiendo de tu lógica, podrías lanzar un error o continuar
+    }
+    
+    const uploadPromises = files.map(async (file, index) => {
+      console.log(`Procesando imagen ${index + 1}/${files.length}: ${file.name}`);
+      
       // Validar tipo de archivo
       if (!file.type.startsWith('image/')) {
+        console.warn(`El archivo ${file.name} no es una imagen`);
         throw new Error(`El archivo ${file.name} debe ser una imagen`);
       }
 
       // Validar tamaño (5MB máximo)
       const MAX_SIZE = 5 * 1024 * 1024;
       if (file.size > MAX_SIZE) {
+        console.warn(`El archivo ${file.name} excede el tamaño máximo`);
         throw new Error(`La imagen ${file.name} no debe superar los 5MB`);
       }
 
       // Generar nombre único
       const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${uuidv4()}.${extension}`;
+      console.log(`Nombre generado para imagen ${index + 1}: ${fileName}`);
 
       // Crear referencia con estructura de carpetas
       const storageRef = ref(
@@ -45,31 +65,26 @@ export async function uploadMaintenanceImages(
         `hotels/${hotelId}/maintenance/${maintenanceId}/${fileName}`
       );
 
-      // Metadata del archivo
-      const metadata = {
-        contentType: file.type,
-        customMetadata: {
-          hotelId,
-          maintenanceId,
-          uploadedBy: staffSession.id,
-          uploadedByName: staffSession.name,
-          originalName: file.name,
-          uploadedAt: new Date().toISOString()
-        }
-      };
-
       // Subir archivo
-      const snapshot = await uploadBytes(storageRef, file, metadata);
+      console.log(`Iniciando subida de imagen ${index + 1}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      console.log(`Imagen ${index + 1} subida correctamente`);
       
       // Obtener URL
-      return await getDownloadURL(snapshot.ref);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      console.log(`URL obtenida para imagen ${index + 1}: ${downloadUrl}`);
+      
+      return downloadUrl;
     });
 
+    console.log('Esperando que todas las subidas terminen...');
     // Esperar que todas las subidas terminen
     const urls = await Promise.all(uploadPromises);
+    console.log(`${urls.length} imágenes subidas exitosamente`);
+    
     return urls;
   } catch (error) {
     console.error('Error al subir imágenes:', error);
-    throw new Error(error instanceof Error ? error.message : 'Error al subir las imágenes');
+    throw error;
   }
 }

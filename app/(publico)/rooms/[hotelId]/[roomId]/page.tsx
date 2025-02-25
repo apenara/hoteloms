@@ -1,66 +1,151 @@
-//esta es la pagina publica de la habitacion, es decir la que ve el huesped, solo debe poder enviar solicitudes a recepcion y ver el estado de la habitacion
+//esta es la pagina publica de las habitaciones, aqui se muestra la informacion de la habitacion y se pueden hacer solicitudes de servicios y mensajes a la recepcion
+//tambien se puede acceder a la vista de staff para gestionar la habitacion con un PIN o un login de email
+//se importan los hooks de react y de next para la navegacion y los parametros de la url
+//se importan los hooks de autenticacion y los componentes de la aplicacion
 
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Moon, Paintbrush, Waves, MessageSquare } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useParams, useRouter } from 'next/navigation';
-import { Input } from "@/components/ui/input";
 import { useAuth } from '@/lib/auth';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
-import { Label } from '@/components/ui/label';
+import { GuestServices } from '@/app/components/guest/GuestServices';
+import { StaffAccessSection } from '@/app/components/guest/StaffAccessSection';
+import { MessageDialog } from '@/app/components/guest/MessageDialog';
 import { PinLogin } from '@/components/staff/PinLogin';
 import StaffLoginDialog from '@/components/staff/StaffLoginDialog';
-import { logAccess } from '@/app/services/access-logs';
 import { hasPermission } from '@/app/lib/constants/permissions';
+import { logAccess } from '@/app/services/access-logs';
 import { sendGuestRequestNotification } from '@/app/services/guestNotificationService';
+import { Staff, Hotel, Room } from '@/app/lib/types';
 
-
+/**
+ * @function PublicRoomView
+ * @description This component renders the public view of a room, accessible to guests.
+ * Guests can view room information, request services, and send messages to reception.
+ * Staff members can also access this page for specific room management using a PIN or email login.
+ * @returns {JSX.Element} The rendered PublicRoomView component.
+ */
 export default function PublicRoomView() {
+  // Hooks
+  /**
+   * @const router
+   * @description The Next.js router instance used for programmatic navigation.
+   */
   const router = useRouter();
-  const params = useParams();
+
+  /**
+   * @const params
+   * @description Extracts the dynamic segments `hotelId` and `roomId` from the URL.
+   * @type {{ hotelId: string, roomId: string }}
+   * @property {string} hotelId - The ID of the hotel.
+   * @property {string} roomId - The ID of the room.
+   */
+  const params = useParams<{ hotelId: string, roomId: string }>();
+
+  /**
+   * @const useAuth
+   * @description Custom hook that provides authentication-related functionality and the current user if authenticated.
+   * @returns {{ user: User | Staff | null }} An object containing the authenticated user or staff member.
+   */
   const { user } = useAuth();
 
-  const [room, setRoom] = useState(null);
-  const [hotel, setHotel] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  // State variables
+  /**
+   * @const room
+   * @description State variable that stores the data of the current room.
+   * @type {Room | null}
+   */
+  const [room, setRoom] = useState<Room | null>(null);
 
-  // Estados para diálogos
-  const [showMessageDialog, setShowMessageDialog] = useState(false);
-  const [showPinLogin, setShowPinLogin] = useState(false);
-  const [showStaffLogin, setShowStaffLogin] = useState(false);
+  /**
+   * @const hotel
+   * @description State variable that stores the data of the current hotel.
+   * @type {Hotel | null}
+   */
+  const [hotel, setHotel] = useState<Hotel | null>(null);
 
-  // Estado para el mensaje
-  const [message, setMessage] = useState('');
+  /**
+   * @const loading
+   * @description State variable indicating whether the component is currently fetching data.
+   * @type {boolean}
+   */
+  const [loading, setLoading] = useState<boolean>(true);
 
+  /**
+   * @const error
+   * @description State variable storing any error that occurred during data fetching or processing.
+   * @type {string | null}
+   */
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * @const successMessage
+   * @description State variable to store a success message to display to the user after an action.
+   * @type {string}
+   */
+  const [successMessage, setSuccessMessage] = useState<string>('');
+
+  /**
+   * @const showMessageDialog
+   * @description State variable controlling the visibility of the message dialog.
+   * @type {boolean}
+   */
+  const [showMessageDialog, setShowMessageDialog] = useState<boolean>(false);
+
+  /**
+   * @const showPinLogin
+   * @description State variable controlling the visibility of the PIN login dialog for staff.
+   * @type {boolean}
+   */
+  const [showPinLogin, setShowPinLogin] = useState<boolean>(false);
+
+  /**
+   * @const showStaffLogin
+   * @description State variable controlling the visibility of the staff email login dialog.
+   * @type {boolean}
+   */
+  const [showStaffLogin, setShowStaffLogin] = useState<boolean>(false);
+
+  /**
+   * @const message
+   * @description State variable to store the message input by the guest in the message dialog.
+   * @type {string}
+   */
+  const [message, setMessage] = useState<string>('');
+
+  /**
+   * @useEffect
+   * @description Fetches the room and hotel data when the component mounts or the URL parameters change.
+   * @dependency params.hotelId - changes when the hotel id changes
+   * @dependency params.roomId - changes when the room id changes
+   * @returns {void}
+   */
   useEffect(() => {
     const fetchRoomData = async () => {
+      // Check if hotelId and roomId are present
       if (!params?.hotelId || !params?.roomId) return;
 
       try {
         setLoading(true);
+
+        // Fetch hotel data
         const hotelDoc = await getDoc(doc(db, 'hotels', params.hotelId));
         if (!hotelDoc.exists()) {
           throw new Error('Hotel no encontrado');
         }
-        setHotel({ id: hotelDoc.id, ...hotelDoc.data() });
+        setHotel({ id: hotelDoc.id, ...hotelDoc.data() } as Hotel);
 
+        // Fetch room data
         const roomDoc = await getDoc(doc(db, 'hotels', params.hotelId, 'rooms', params.roomId));
         if (!roomDoc.exists()) {
           throw new Error('Habitación no encontrada');
         }
-        setRoom({ id: roomDoc.id, ...roomDoc.data() });
-      } catch (error) {
+        setRoom({ id: roomDoc.id, ...roomDoc.data() } as Room);
+      } catch (error: any) {
         console.error('Error:', error);
         setError(error.message);
       } finally {
@@ -69,16 +154,25 @@ export default function PublicRoomView() {
     };
 
     fetchRoomData();
-  }, [params]);
+  }, [params.hotelId, params.roomId]);
 
-  const handleStaffAccess = async (staffMember) => {
+  /**
+   * @function handleStaffAccess
+   * @description Handles staff access to the room using a PIN.
+   * It verifies if the staff member has the correct permissions and then stores
+   * the staff access information, logs the access and redirect to the staff view of the room.
+   * @async
+   * @param {Staff} staffMember - The staff member data.
+   * @returns {Promise<void>}
+   */
+  const handleStaffAccess = async (staffMember: Staff) => {
     try {
-      // Verificar permisos básicos
+      // Permission check
       if (!hasPermission(staffMember.role, 'canChangeRoomStatus')) {
         throw new Error('No tienes permisos para acceder a esta sección');
       }
 
-      // Crear el objeto de acceso
+      // Staff access object
       const staffAccess = {
         id: staffMember.id,
         userId: staffMember.userId,
@@ -90,16 +184,16 @@ export default function PublicRoomView() {
         timestamp: new Date().toISOString()
       };
 
-      // Guardar en localStorage
+      // Store in localStorage
       localStorage.setItem('staffAccess', JSON.stringify(staffAccess));
 
-      // Guardar en sessionStorage
+      // Store in sessionStorage
       sessionStorage.setItem('currentStaffSession', JSON.stringify({
         ...staffAccess,
         sessionStart: new Date().toISOString()
       }));
 
-      // Registrar el acceso
+      // Log access
       await logAccess({
         userId: staffMember.id,
         userName: staffMember.name,
@@ -110,22 +204,31 @@ export default function PublicRoomView() {
         action: 'room_access'
       });
 
-      // Redireccionar
-      window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
-    } catch (error) {
+      // Redirect to staff room view
+      router.push(`/rooms/${params.hotelId}/${params.roomId}/staff`);
+    } catch (error: any) {
       console.error('Error en acceso de staff:', error);
       setError(error.message);
     }
   };
 
-  const handleLoginSuccess = async (user) => {
+  /**
+   * @function handleLoginSuccess
+   * @description Handles the successful login of a staff member using their email.
+   * It checks if the user has the right permissions and logs the access.
+   * If everything is correct it redirects the user to the staff view of the room.
+   * @async
+   * @param {object} user - The user's data.
+   * @returns {Promise<void>}
+   */
+  const handleLoginSuccess = async (user: any) => {
     try {
-      // Verificar permisos para usuarios administrativos
+      // Permission check for administrative users
       if (!hasPermission(user.role, 'canAccessOperationalPages')) {
         throw new Error('No tienes permisos para acceder a esta sección');
       }
 
-      // Registrar el acceso
+      // Log access
       await logAccess({
         userId: user.id,
         userName: user.name,
@@ -136,100 +239,61 @@ export default function PublicRoomView() {
         action: 'room_access'
       });
 
-      // Redireccionar
-      window.location.href = `/rooms/${params.hotelId}/${params.roomId}/staff`;
-    } catch (error) {
+      // Redirect to staff room view
+      router.push(`/rooms/${params.hotelId}/${params.roomId}/staff`);
+    } catch (error: any) {
       console.error('Error en login:', error);
       setError(error.message);
     }
   };
 
-  const handleStatusChange = async (newStatus) => {
-    if (!params?.hotelId || !params?.roomId) return;
-  
-    try {
-      const timestamp = new Date();
-      const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
-  
-      // Crear solicitud con más detalles
-      await addDoc(requestsRef, {
-        roomId: params.roomId,
-        roomNumber: room?.number,
-        type: newStatus,
-        status: 'pending',
-        createdAt: timestamp,
-        source: 'guest',
-        priority: newStatus === 'need_cleaning' ? 'high' : 'medium',
-        details: {
-          previousStatus: room?.status,
-          requestType: 'guest_initiated',
-          guestRequest: true
-        }
-      });
-  
-      // Registrar en historial
-      const historyRef = collection(db, 'hotels', params.hotelId, 'rooms', params.roomId, 'history');
-      await addDoc(historyRef, {
-        type: 'guest_request',
-        requestType: newStatus,
-        timestamp,
-        source: 'guest',
-        notes: `Solicitud de huésped: ${newStatus}`,
-        room: {
-          number: room?.number,
-          id: room?.id
-        }
-      });
-
-        // Enviar notificación
-    await sendGuestRequestNotification({
-      type: newStatus,
-      hotelId: params.hotelId,
-      roomNumber: room.number,
-      roomId: params.roomId
-    });
-  
-      setSuccessMessage('Solicitud enviada correctamente');
-      setTimeout(() => setSuccessMessage(''), 3000);
-  
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Error al procesar la solicitud');
-    }
-  };
+  /**
+   * @function handleMessageSubmit
+   * @description Handles the submission of a message from the guest to the reception.
+   * It stores the message as a new request in Firestore and sends a notification to the staff.
+   * @async
+   * @returns {Promise<void>}
+   */
   const handleMessageSubmit = async () => {
-    if (!message.trim() || !params?.hotelId || !params?.roomId) return;
+    // Check if the message is empty or the data is missing
+    if (!message.trim() || !params?.hotelId || !params?.roomId || !room) return;
 
     try {
+      // Create request
       const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
       await addDoc(requestsRef, {
         roomId: params.roomId,
-        roomNumber: room?.number,
+        roomNumber: room.number,
         message,
         status: 'pending',
         createdAt: new Date(),
         type: 'guest_request'
       });
 
-       // Enviar notificación
-    await sendGuestRequestNotification({
-      type: 'guest_request',
-      hotelId: params.hotelId,
-      roomNumber: room.number, 
-      roomId: params.roomId,
-      message: message.substring(0, 100) // Primeros 100 caracteres del mensaje
-    });
+      // Send notification
+      await sendGuestRequestNotification({
+        type: 'guest_request',
+        hotelId: params.hotelId,
+        roomNumber: room.number,
+        roomId: params.roomId,
+        message: message.substring(0, 100)
+      });
 
+      // Reset state and show success message
       setMessage('');
       setShowMessageDialog(false);
       setSuccessMessage('Mensaje enviado correctamente');
       setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       setError('Error al enviar el mensaje');
     }
   };
 
+  /**
+   * @description Conditional rendering for loading state
+   * Show a loading indicator when data is being fetched.
+   */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -241,6 +305,10 @@ export default function PublicRoomView() {
     );
   }
 
+  /**
+   * @description Conditional rendering for error state
+   * Show an error message when something goes wrong.
+   */
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -251,59 +319,42 @@ export default function PublicRoomView() {
     );
   }
 
+  /**
+   * @description Conditional rendering for null values
+   * If hotel or room does not exist will return null.
+   */
   if (!room || !hotel) return null;
 
+  /**
+   * @description Main component render.
+   * If there is no error, and the data has been loaded.
+   */
   return (
     <div className="p-4 max-w-md mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">{hotel.hotelName} - Habitación {room.number}</CardTitle>
+          <CardTitle className="text-xl">{hotel.name} - Habitación {room.number}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Success message alert */}
           {successMessage && (
             <Alert className="mb-4 bg-green-100">
               <AlertDescription>{successMessage}</AlertDescription>
             </Alert>
           )}
+          {/* Component for Guest Services */}
+          <GuestServices
+            room={room}
+            hotelId={params.hotelId}
+            roomId={params.roomId}
+            onShowMessage={() => setShowMessageDialog(true)}
+            onSuccess={(message) => {
+              setSuccessMessage(message);
+              setTimeout(() => setSuccessMessage(''), 3000);
+            }}
+          />
 
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              className="flex flex-col items-center p-6 h-auto"
-              variant="outline"
-              onClick={() => handleStatusChange('need_cleaning')}
-            >
-              <Paintbrush className="h-8 w-8 mb-2" />
-              <span>Solicitar Limpieza</span>
-              <span className="text-xs text-gray-500 mt-1">
-                Servicio de limpieza
-              </span>
-            </Button>
-
-            <Button
-              className="flex flex-col items-center p-6 h-auto"
-              variant="outline"
-              onClick={() => handleStatusChange('need_towels')}
-            >
-              <Waves className="h-8 w-8 mb-2" />
-              <span>Solicitar Toallas</span>
-              <span className="text-xs text-gray-500 mt-1">
-                Toallas adicionales
-              </span>
-            </Button>
-
-            <Button
-              className="flex flex-col items-center p-6 h-auto col-span-2"
-              variant="outline"
-              onClick={() => setShowMessageDialog(true)}
-            >
-              <MessageSquare className="h-8 w-8 mb-2" />
-              <span>Enviar Mensaje</span>
-              <span className="text-xs text-gray-500 mt-1">
-                Contactar a recepción
-              </span>
-            </Button>
-          </div>
-
+          {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
@@ -314,75 +365,40 @@ export default function PublicRoomView() {
               </span>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowPinLogin(true)}
-            >
-              Acceso con PIN
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowStaffLogin(true)}
-            >
-              Acceso con Email
-            </Button>
-          </div>
-
-          {user && (
-            <Button
-              className="w-full mt-4"
-              variant="outline"
-              onClick={() => router.push(`/rooms/${params.hotelId}/${params.roomId}/staff`)}
-            >
-              Acceder a Opciones del Personal
-            </Button>
-          )}
+          {/* Component for Staff access */}
+          <StaffAccessSection
+            user={user}
+            router={router}
+            params={params}
+            onPinAccess={() => setShowPinLogin(true)}
+            onEmailAccess={() => setShowStaffLogin(true)}
+          />
         </CardContent>
       </Card>
 
-      {/* Diálogos */}
+      {/* Dialogs */}
+      {/* PIN Login Dialog */}
       <PinLogin
         isOpen={showPinLogin}
         onClose={() => setShowPinLogin(false)}
         onSuccess={handleStaffAccess}
         hotelId={params.hotelId}
       />
-
+      {/* Staff Login Dialog */}
       <StaffLoginDialog
         isOpen={showStaffLogin}
         onClose={() => setShowStaffLogin(false)}
         onSuccess={handleLoginSuccess}
         hotelId={params.hotelId}
       />
-
-      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enviar mensaje a recepción</DialogTitle>
-            <DialogDescription>
-              Escriba su mensaje y lo atenderemos lo antes posible
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="Escriba su mensaje aquí..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowMessageDialog(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleMessageSubmit}>
-                Enviar Mensaje
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Message Dialog */}
+      <MessageDialog
+        isOpen={showMessageDialog}
+        onClose={() => setShowMessageDialog(false)}
+        message={message}
+        setMessage={setMessage}
+        onSubmit={handleMessageSubmit}
+      />
     </div>
   );
 }

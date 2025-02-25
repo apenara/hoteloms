@@ -1,3 +1,4 @@
+// src/components/maintenance/MaintenanceDialog.tsx
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageUpload from './ImageUpload';
-import { useAuth } from '@/lib/auth';
 
 interface MaintenanceDialogProps {
   isOpen: boolean;
@@ -15,7 +15,6 @@ interface MaintenanceDialogProps {
     priority: string;
     images: File[];
   }) => Promise<void>;
-  hotelId: string;
   loading?: boolean;
 }
 
@@ -23,47 +22,53 @@ const MaintenanceDialog = ({
   isOpen,
   onClose,
   onSubmit,
-  hotelId,
   loading = false
 }: MaintenanceDialogProps) => {
-  const { user, staff } = useAuth();
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [error, setError] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     try {
       setError('');
-      setIsUploading(true);
-
+      
+      // Validaciones
       if (!description.trim()) {
         setError('La descripción es requerida');
         return;
       }
 
-      if (!user && !staff) {
-        throw new Error('No hay una sesión activa');
-      }
+      // Evitar múltiples envíos
+      if (submitting || loading) return;
+      
+      setSubmitting(true);
+      console.log('Enviando solicitud de mantenimiento:', {
+        description: description.trim(),
+        priority,
+        images: selectedImages.length
+      });
 
-      // Enviar datos incluyendo las imágenes seleccionadas
+      // Llamar a la función de envío
       await onSubmit({
         description: description.trim(),
         priority,
-        images: selectedImages // Pasar las imágenes tal cual las recibimos del ImageUpload
+        images: selectedImages
       });
 
-      // Limpiar formulario
+      // Limpiar el formulario
       setDescription('');
       setPriority('medium');
       setSelectedImages([]);
+      
+      // Cerrar diálogo
       onClose();
     } catch (error) {
-      console.error('Error en la solicitud:', error);
+      console.error('Error al crear la solicitud:', error);
       setError('Error al crear la solicitud: ' + (error.message || 'Error desconocido'));
     } finally {
-      setIsUploading(false);
+      setSubmitting(false);
     }
   };
 
@@ -88,13 +93,13 @@ const MaintenanceDialog = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe el problema que requiere mantenimiento..."
               className="min-h-[100px]"
-              disabled={loading || isUploading}
+              disabled={loading || submitting}
             />
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Prioridad</label>
-            <Select value={priority} onValueChange={setPriority}>
+            <Select value={priority} onValueChange={setPriority} disabled={loading || submitting}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -111,7 +116,7 @@ const MaintenanceDialog = ({
             <ImageUpload
               onImagesSelected={setSelectedImages}
               maxImages={3}
-              disabled={loading || isUploading}
+              disabled={loading || submitting}
             />
             <p className="text-xs text-gray-500">
               Puedes subir hasta 3 imágenes (JPG, PNG o WebP, máx. 5MB cada una)
@@ -124,15 +129,15 @@ const MaintenanceDialog = ({
             type="button"
             variant="outline"
             onClick={onClose}
-            disabled={loading || isUploading}
+            disabled={loading || submitting}
           >
             Cancelar
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || isUploading || !description.trim()}
+            disabled={loading || submitting || !description.trim()}
           >
-            {isUploading ? 'Subiendo...' : loading ? 'Creando...' : 'Crear Solicitud'}
+            {loading || submitting ? 'Creando...' : 'Crear Solicitud'}
           </Button>
         </DialogFooter>
       </DialogContent>

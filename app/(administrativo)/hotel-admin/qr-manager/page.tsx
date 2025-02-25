@@ -1,3 +1,5 @@
+//Aqui se ven las habitaciones y se pueden descargar los codigos QR de las mismas
+//Se pueden descargar de una en una o de varias a la vez
 'use client';
 
 import { useState, useEffect } from 'react';

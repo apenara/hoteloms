@@ -94,6 +94,7 @@ const MaintenanceStaffView = ({ hotelId }) => {
                 try {
                     imageUrls = await uploadMaintenanceImages(
                         hotelId,
+                        selectedRequest.roomId,
                         selectedRequest.id,
                         selectedImages
                     );

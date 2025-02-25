@@ -1,3 +1,6 @@
+// Este es el layout principal para la sección administrativa de la aplicación.
+// Proporciona una barra lateral con enlaces de navegación y un área de contenido principal donde se muestran los componentes secundarios.
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,36 +24,69 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-
+/**
+ * @interface AdminLayoutProps
+ * @description Defines the props for the AdminLayout component.
+ * @property {React.ReactNode} children - The child components to be rendered within the layout.
+ */
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+/**
+ * @function AdminLayout
+ * @description This component provides the main layout for the administrative section of the application.
+ * It renders a sidebar with navigation links and a main content area where the child components are displayed.
+ * It handles user authentication, responsive sidebar behavior, and navigation.
+ * @param {AdminLayoutProps} props - The props for the AdminLayout component.
+ * @returns {JSX.Element} The rendered AdminLayout component.
+ */
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, staff, signOut } = useAuth();
-  const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  // Hooks
+  const { user, staff, signOut } = useAuth(); // Custom hook for authentication
+  const router = useRouter(); // Next.js router for navigation
 
+  // State variables
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // State to control the sidebar's visibility
+  const [isMobile, setIsMobile] = useState(false); // State to track if the screen is in mobile view
+
+  /**
+   * @useEffect
+   * @description This hook checks if the screen is in mobile view and adjusts the sidebar's initial visibility accordingly.
+   * It also adds a resize event listener to update the mobile state when the window is resized.
+   * @listens window#resize
+   */
   useEffect(() => {
     const checkMobile = () => {
-      const isMobileView = window.innerWidth < 768;
-      setIsMobile(isMobileView);
-      setIsSidebarOpen(!isMobileView);
+      const isMobileView = window.innerWidth < 768; // Check if the screen width is less than 768px
+      setIsMobile(isMobileView); // Update the isMobile state
+      setIsSidebarOpen(!isMobileView); // Close the sidebar if in mobile view, open otherwise
     };
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    checkMobile(); // Check the initial state on mount
+    window.addEventListener("resize", checkMobile); // Add the event listener
+    return () => window.removeEventListener("resize", checkMobile); // Cleanup the listener on unmount
   }, []);
 
-  // Verificar autenticación
+  /**
+   * @useEffect
+   * @description This hook verifies the user's authentication status.
+   * If the user is not authenticated, it redirects to the login page.
+   * @dependency user - Changes when the user authentication status changes
+   * @dependency staff - Changes when the staff authentication status changes
+   * @dependency router - Changes when the router object changes
+   */
   useEffect(() => {
     if (!user && !staff) {
-      router.push("/auth/login");
+      router.push("/auth/login"); // Redirect to login if not authenticated
     }
   }, [user, staff, router]);
 
+  /**
+   * @constant navigation
+   * @description Defines the navigation items for the sidebar.
+   * Each item has a name, a link (href), and an icon.
+   */
   const navigation = [
     {
       name: "Dashboard",
@@ -89,17 +125,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     },
   ];
 
+  /**
+   * @function closeSidebar
+   * @description Closes the sidebar if the application is in mobile view.
+   * @returns {void}
+   */
   const closeSidebar = () => {
     if (isMobile) {
       setIsSidebarOpen(false);
     }
   };
 
+  // Guard clause: if the user is not authenticated, return null
   if (!user && !staff) return null;
 
+  // Render the main layout
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Overlay para cerrar en móviles */}
+      {/* Overlay for closing the sidebar in mobile view */}
       {isMobile && isSidebarOpen && (
         <div
           className="fixed inset-0 z-30 bg-black bg-opacity-50 transition-opacity lg:hidden"
@@ -115,7 +158,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         }`}
       >
         <div className="flex h-full flex-col">
-          {/* Logo y botón cerrar en móviles */}
+          {/* Logo and close button (mobile) */}
           <div className="flex h-16 items-center justify-between border-b px-4">
             <Link
               href="/hotel-admin/dashboard"

@@ -1,18 +1,55 @@
+// esta es la estructura de la pagina de super admin
+// es el layout que se va a mostrar en la pagina de super admin
+// se muestra el sidebar con las opciones de navegacion
+
 "use client";
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  Hotel, 
-  Users, 
+import {
+  LayoutDashboard,
+  Hotel,
+  Users,
   Settings,
   LogOut,
   Menu
 } from 'lucide-react';
 
-export default function DashboardLayout({ children }) {
+/**
+ * @interface DashboardLayoutProps
+ * @description Defines the props for the DashboardLayout component.
+ * @property {React.ReactNode} children - The child components to be rendered within the layout.
+ */
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+}
+
+/**
+ * @function DashboardLayout
+ * @description This component provides the main layout for the Super Admin dashboard.
+ * It includes a sidebar with navigation links, a logo, and a logout button.
+ * The sidebar can be toggled on smaller screens. The main content is rendered in the main section.
+ * @param {DashboardLayoutProps} props - The props passed to the component.
+ * @returns {JSX.Element} The rendered DashboardLayout component.
+ */
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  // State Variables
+  /**
+   * @const isSidebarOpen
+   * @description State variable to control the visibility of the sidebar.
+   * It is initially set to `true` (open) and will be updated to `false` (closed) when needed.
+   * @type {boolean}
+   */
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  /**
+   * @constant menuItems
+   * @description An array of objects, each defining a navigation item for the sidebar.
+   * @type {Array<{ title: string; icon: JSX.Element; href: string }>}
+   * @property {string} title - The title of the menu item.
+   * @property {JSX.Element} icon - The icon to display for the menu item.
+   * @property {string} href - The URL for the menu item.
+   */
   const menuItems = [
     {
       title: 'Dashboard',
@@ -36,11 +73,22 @@ export default function DashboardLayout({ children }) {
     }
   ];
 
+  /**
+   * @function handleLogout
+   * @description Handles the logout action.
+   * It redirects the user to the login page.
+   * @async
+   * @returns {void}
+   */
   const handleLogout = async () => {
-    // Implementar logout
+    // Redirect to login page
     window.location.href = '/auth/login';
   };
 
+  /**
+   * @description Main component render
+   * Render the main layout of the super admin dashboard.
+   */
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Sidebar */}
@@ -55,13 +103,16 @@ export default function DashboardLayout({ children }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1">
+            {/* Map over the navigation menu */}
             {menuItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
                 className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
               >
+                {/* Menu item icon */}
                 {item.icon}
+                {/* Menu item title */}
                 <span className="ml-3">{item.title}</span>
               </a>
             ))}

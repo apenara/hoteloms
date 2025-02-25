@@ -1,3 +1,5 @@
+//Pagina principal del dashboard del hotel
+//Se muestra un listado de habitaciones, filtros y contadores de estado
 "use client";
 
 import React, { useState, useMemo, useEffect, JSX } from "react";
@@ -5,7 +7,6 @@ import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/config";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 import { Search, Building } from "lucide-react";
 import { RoomCard } from "@/components/hotels/RoomCard";
 import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
@@ -23,6 +23,14 @@ import { User, Room } from "@/app/lib/types";
 import { Button } from "@/app/components/ui/button";
 import AuthMonitor from "@/app/components/dashboard/AuthMonitor";
 
+/**
+ * @description This constant defines the different states a room can have and their respective labels, icons, and colors.
+ * @property {string} key - The key of the room state (e.g., "available", "occupied").
+ * @property {object} value - An object containing the label, icon, and color for the room state.
+ * @property {string} value.label - The human-readable label of the room state.
+ * @property {JSX.Element} value.icon - The icon component for the room state.
+ * @property {string} value.color - The CSS class name for the background color of the room state.
+ */
 const ESTADOS: Record<
   string,
   { label: string; icon: JSX.Element; color: string }
@@ -38,15 +46,28 @@ const ESTADOS: Record<
   {}
 );
 
+/**
+ * @description HotelDashboard component - This is the main dashboard for hotel administrators.
+ * It displays a list of rooms, filters, and status counters.
+ * @returns {JSX.Element} The rendered HotelDashboard component.
+ */
 export default function HotelDashboard() {
-  const { user } = useAuth() as { user: User | null };
-  const [habitaciones, setHabitaciones] = useState<Room[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  // const [error, setError] = useState(null);
-  const [busqueda, setBusqueda] = useState("");
-  const [pisoSeleccionado, setPisoSeleccionado] = useState("todos");
-  const [error, setError] = useState<string | null>(null);
+  // Hooks
+  const { user } = useAuth() as { user: User | null }; // Custom hook for user authentication
+  const [habitaciones, setHabitaciones] = useState<Room[]>([]); // State for storing the list of rooms
+  const [isLoading, setIsLoading] = useState(true); // State for tracking data loading status
+  // const [error, setError] = useState(null); // State for tracking errors
+  const [busqueda, setBusqueda] = useState(""); // State for the search input value
+  const [pisoSeleccionado, setPisoSeleccionado] = useState("todos"); // State for the selected floor filter
+  const [error, setError] = useState<string | null>(null); //state to show error messages
 
+  /**
+   * @description useEffect hook - This hook fetches the rooms data from Firestore.
+   * It listens for real-time changes in the 'rooms' collection within the user's hotel and
+   * updates the `habitaciones` state when data changes.
+   * @param {object} user - The current user object, obtained from the useAuth hook.
+   * @returns {() => void} A cleanup function that unsubscribes from the Firestore listener.
+   */
   useEffect(() => {
     let unsubscribe = () => {};
 
@@ -81,6 +102,12 @@ export default function HotelDashboard() {
     return () => unsubscribe();
   }, [user]);
 
+  /**
+   * @description useMemo hook - This hook calculates the total number of rooms for each state.
+   * It is memoized to avoid recalculations unless the `habitaciones` state changes.
+   * @param {Room[]} habitaciones - An array of room objects.
+   * @returns {Record<string, number>} An object where keys are room states and values are their counts.
+   */
   const contadoresTotales = useMemo(() => {
     return habitaciones.reduce((acc: Record<string, number>, habitacion) => {
       const estado = habitacion.status || "available";
@@ -89,12 +116,27 @@ export default function HotelDashboard() {
     }, {} as Record<string, number>);
   }, [habitaciones]);
 
+  /**
+   * @description useMemo hook - This hook calculates the unique floors present in the rooms data.
+   * It is memoized to avoid recalculations unless the `habitaciones` state changes.
+   * @param {Room[]} habitaciones - An array of room objects.
+   * @returns {number[]} An array of unique floor numbers, sorted in ascending order.
+   */
   const pisosUnicos = useMemo(() => {
     return [...new Set(habitaciones.map((h) => h.floor))].sort((a, b) => a - b);
   }, [habitaciones]);
 
-  const [estadoFiltrado, setEstadoFiltrado] = useState("todos");
+  const [estadoFiltrado, setEstadoFiltrado] = useState("todos"); // State for the selected state filter
 
+  /**
+   * @description useMemo hook - This hook filters and sorts the rooms based on the current filters.
+   * It is memoized to avoid recalculations unless any of the dependencies change.
+   * @param {Room[]} habitaciones - An array of room objects.
+   * @param {string} pisoSeleccionado - The selected floor filter.
+   * @param {string} busqueda - The search input value.
+   * @param {string} estadoFiltrado - The selected room status filter.
+   * @returns {Room[]} An array of filtered and sorted room objects.
+   */
   const habitacionesFiltradas = useMemo(() => {
     // Primero filtramos las habitaciones
     const habitacionesFiltradas = habitaciones.filter((habitacion) => {
@@ -117,15 +159,6 @@ export default function HotelDashboard() {
       return numA - numB;
     });
   }, [habitaciones, pisoSeleccionado, busqueda, estadoFiltrado]);
-
-  // Calcular contadores por estado
-  // const contadores = useMemo(() => {
-  //   return habitacionesFiltradas.reduce((acc, habitacion) => {
-  //     const estado = habitacion.status || "available";
-  //     acc[estado] = (acc[estado] || 0) + 1;
-  //     return acc;
-  //   }, {});
-  // }, [habitacionesFiltradas]);
 
   return (
     <div className="p-4">
