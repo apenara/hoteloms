@@ -1,7 +1,6 @@
 // src/components/housekeeping/HousekeepingStats.tsx
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   BarChart,
   Bar,
@@ -15,18 +14,20 @@ import {
   Cell,
 } from "recharts";
 import type { Staff, Room } from "@/app/lib/types";
-import { BedDouble, Clock, CheckCircle, Timer, Users } from "lucide-react";
+import { BedDouble, Clock, CheckCircle, Timer, Users, Loader2 } from "lucide-react";
 
 interface HousekeepingStatsProps {
   camareras: Staff[];
   habitaciones: Room[];
   estadisticasGlobales: any;
-} 
+  loading:boolean;
+}
 
 export function HousekeepingStats({
   camareras,
   habitaciones,
   estadisticasGlobales,
+  loading
 }: HousekeepingStatsProps) {
   // Calcular estadísticas por tipo de limpieza
   const calcularEstadisticasPorTipo = () => {
@@ -51,34 +52,37 @@ export function HousekeepingStats({
       },
     };
 
-    habitaciones.forEach((hab) => {
-      if (
-        hab.status === "cleaning_checkout" ||
-        hab.lastStatusChange?.toDate().toDateString() ===
-          new Date().toDateString()
-      ) {
-        stats.checkout.total++;
-        if (hab.status === "cleaning_checkout") stats.checkout.enProgreso++;
-        if (hab.tiempoLimpieza) {
-          stats.checkout.tiempoPromedio += hab.tiempoLimpieza;
-          stats.checkout.completadas++;
+    // Check if habitaciones exists and is an array before using forEach
+    if (habitaciones && Array.isArray(habitaciones)) {
+      habitaciones.forEach((hab) => {
+        if (
+          hab.status === "cleaning_checkout" ||
+          hab.lastStatusChange?.toDate().toDateString() ===
+            new Date().toDateString()
+        ) {
+          stats.checkout.total++;
+          if (hab.status === "cleaning_checkout") stats.checkout.enProgreso++;
+          if (hab.tiempoLimpieza) {
+            stats.checkout.tiempoPromedio += hab.tiempoLimpieza;
+            stats.checkout.completadas++;
+          }
+        } else if (hab.status === "cleaning_occupied") {
+          stats.occupied.total++;
+          stats.occupied.enProgreso++;
+          if (hab.tiempoLimpieza) {
+            stats.occupied.tiempoPromedio += hab.tiempoLimpieza;
+            stats.occupied.completadas++;
+          }
+        } else if (hab.status === "cleaning_touch") {
+          stats.touch.total++;
+          stats.touch.enProgreso++;
+          if (hab.tiempoLimpieza) {
+            stats.touch.tiempoPromedio += hab.tiempoLimpieza;
+            stats.touch.completadas++;
+          }
         }
-      } else if (hab.status === "cleaning_occupied") {
-        stats.occupied.total++;
-        stats.occupied.enProgreso++;
-        if (hab.tiempoLimpieza) {
-          stats.occupied.tiempoPromedio += hab.tiempoLimpieza;
-          stats.occupied.completadas++;
-        }
-      } else if (hab.status === "cleaning_touch") {
-        stats.touch.total++;
-        stats.touch.enProgreso++;
-        if (hab.tiempoLimpieza) {
-          stats.touch.tiempoPromedio += hab.tiempoLimpieza;
-          stats.touch.completadas++;
-        }
-      }
-    });
+      });
+    }
 
     // Calcular promedios
     ["checkout", "occupied", "touch"].forEach((tipo) => {
@@ -131,7 +135,13 @@ export function HousekeepingStats({
       color: "#ef4444",
     },
   ];
-
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <Loader2 className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+            </div>
+        );
+    }
   return (
     <div className="space-y-6">
       {/* Cards de Resumen por Tipo */}
