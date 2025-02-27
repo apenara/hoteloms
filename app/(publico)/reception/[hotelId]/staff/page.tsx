@@ -2,24 +2,31 @@
 // Permite a los recepcionistas ver el estado de las habitaciones, gestionar las solicitudes de los huéspedes y manejar las operaciones del hotel.
 // Obtiene los datos del hotel, las habitaciones y las solicitudes de Firestore y las representa en una interfaz con pestañas.
 // Es el centro de mando para el personal de recepción.
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { NotificationsDialog } from '@/components/dashboard/NotificationsDialog';
-import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import { LogOut } from 'lucide-react';
-import { toast } from '@/app/hooks/use-toast';
-import { GuestRequestDialog } from '@/app/components/front/GuestRequestDialog';
-import { RoomsSection } from '@/app/components/reception/RoomsSection';
-import { RequestsSection } from '@/app/components/reception/RequestsSection';
-import { Staff, Hotel, Room, Request } from '@/app/lib/types';
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NotificationsDialog } from "@/components/dashboard/NotificationsDialog";
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  doc,
+  getDoc,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { LogOut } from "lucide-react";
+import { toast } from "@/app/hooks/use-toast";
+import { GuestRequestDialog } from "@/app/components/front/GuestRequestDialog";
+import { RoomsSection } from "@/app/components/reception/RoomsSection";
+import { RequestsSection } from "@/app/components/reception/RequestsSection";
+import { Staff, Hotel, Room, Request } from "@/app/lib/types";
 
 /**
  * @function ReceptionStaffPage
@@ -45,7 +52,10 @@ export default function ReceptionStaffPage() {
    * signOut allows the staff member to log out.
    * @type {{ staff: Staff | null; signOut: () => void }}
    */
-  const { staff, signOut } = useAuth() as { staff: Staff | null; signOut: () => void };
+  const { staff, signOut } = useAuth() as {
+    staff: Staff | null;
+    signOut: () => void;
+  };
 
   /**
    * @const hotelData
@@ -87,13 +97,13 @@ export default function ReceptionStaffPage() {
   useEffect(() => {
     const fetchHotelData = async () => {
       try {
-        const hotelDoc = await getDoc(doc(db, 'hotels', params.hotelId));
+        const hotelDoc = await getDoc(doc(db, "hotels", params.hotelId));
         if (hotelDoc.exists()) {
           setHotelData({ id: hotelDoc.id, ...hotelDoc.data() } as Hotel);
         }
       } catch (error) {
-        console.error('Error fetching hotel:', error);
-        setError('Error al obtener la informacion del hotel');
+        console.error("Error fetching hotel:", error);
+        setError("Error al obtener la informacion del hotel");
       } finally {
         setLoading(false);
       }
@@ -116,38 +126,39 @@ export default function ReceptionStaffPage() {
    */
   useEffect(() => {
     // Check if staff member is authenticated and has the right role
-    if (!staff || staff.role !== 'reception') {
-      setError('Acceso no autorizado');
+    if (!staff || staff.role !== "reception") {
+      setError("Acceso no autorizado");
       return;
     }
 
     // Subscription to rooms
-    const roomsRef = collection(db, 'hotels', params.hotelId, 'rooms');
-    const roomsUnsubscribe = onSnapshot(roomsRef, (snapshot) => {
-      const roomsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Room[];
-      setRooms(roomsData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error:', error);
-      setError('Error al cargar los datos de las habitaciones');
-      setLoading(false);
-    });
-
-    // Subscription to requests
-    const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
-    const requestsQuery = query(
-      requestsRef,
-      orderBy('createdAt', 'desc')
+    const roomsRef = collection(db, "hotels", params.hotelId, "rooms");
+    const roomsUnsubscribe = onSnapshot(
+      roomsRef,
+      (snapshot) => {
+        const roomsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Room[];
+        setRooms(roomsData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error:", error);
+        setError("Error al cargar los datos de las habitaciones");
+        setLoading(false);
+      }
     );
 
+    // Subscription to requests
+    const requestsRef = collection(db, "hotels", params.hotelId, "requests");
+    const requestsQuery = query(requestsRef, orderBy("createdAt", "desc"));
+
     const requestsUnsubscribe = onSnapshot(requestsQuery, (snapshot) => {
-      const requestsData = snapshot.docs.map(doc => ({
+      const requestsData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
+        createdAt: doc.data().createdAt?.toDate(),
       })) as Request[];
       setRequests(requestsData);
     });
@@ -192,7 +203,7 @@ export default function ReceptionStaffPage() {
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="text-2xl font-bold">
-                {hotelData?.name || 'Cargando...'}
+                {hotelData?.hotelName || "Cargando..."}
               </CardTitle>
               <p className="text-sm text-gray-500">
                 Usuario: {staff?.name} ({staff?.role})
@@ -206,17 +217,15 @@ export default function ReceptionStaffPage() {
                 onRequestCreated={() => {
                   toast({
                     title: "Solicitud creada",
-                    description: "Se ha creado una nueva solicitud exitosamente"
-                  })
+                    description:
+                      "Se ha creado una nueva solicitud exitosamente",
+                  });
                 }}
               />
               {/* Notifications Dialog */}
               <NotificationsDialog hotelId={params.hotelId} />
               {/* Logout Button */}
-              <Button
-                variant="outline"
-                onClick={() => signOut()}
-              >
+              <Button variant="outline" onClick={() => signOut()}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Cerrar Sesión
               </Button>

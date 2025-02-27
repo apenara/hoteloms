@@ -1,50 +1,58 @@
 "use client";
-import React, { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { 
+import React, { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
   AlertTriangle,
   Clock,
   Calendar,
   User,
   ChevronDown,
-  ChevronUp
-} from 'lucide-react';
+  ChevronUp,
+} from "lucide-react";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import ImageGallery from './ImageGallery';
-import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+} from "@/components/ui/select";
+import ImageGallery from "./ImageGallery";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface MaintenanceRequestCardProps {
   request: any;
   staff: any[];
   hotelId: string;
-  onAssign: (request: any, staffId: string, scheduledDate: Date) => Promise<void>;
+  onAssign: (
+    request: any,
+    staffId: string,
+    scheduledDate: Date
+  ) => Promise<void>;
 }
 
 const MaintenanceRequestCard = ({
   request,
   staff,
   hotelId,
-  onAssign
+  onAssign,
 }: MaintenanceRequestCardProps) => {
-  const [selectedStaff, setSelectedStaff] = useState('');
+  const [selectedStaff, setSelectedStaff] = useState("");
   const [scheduledDate, setScheduledDate] = useState<Date>(new Date());
   const [isAssigning, setIsAssigning] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
   const handleAssign = async () => {
     if (!selectedStaff || !scheduledDate) return;
-    
+
     setIsAssigning(true);
     try {
       await onAssign(request, selectedStaff, scheduledDate);
@@ -55,10 +63,14 @@ const MaintenanceRequestCard = ({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "high":
+        return "bg-red-100 text-red-800";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800";
+      case "low":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -70,12 +82,17 @@ const MaintenanceRequestCard = ({
             <h4 className="text-lg font-medium flex items-center gap-2">
               {request.location || `Habitación ${request.roomNumber}`}
               <Badge className={getPriorityColor(request.priority)}>
-                {request.priority === 'high' ? 'Alta' : 
-                 request.priority === 'medium' ? 'Media' : 'Baja'}
+                {request.priority === "high"
+                  ? "Alta"
+                  : request.priority === "medium"
+                  ? "Media"
+                  : "Baja"}
               </Badge>
             </h4>
             <p className="text-sm text-gray-500 mt-1">
-              {format(request.createdAt, "d 'de' MMMM 'a las' HH:mm", { locale: es })}
+              {format(request.createdAt, "d 'de' MMMM 'a las' HH:mm", {
+                locale: es,
+              })}
             </p>
           </div>
           <Button
@@ -107,10 +124,7 @@ const MaintenanceRequestCard = ({
                   <User className="h-4 w-4" />
                   Personal Asignado
                 </label>
-                <Select
-                  value={selectedStaff}
-                  onValueChange={setSelectedStaff}
-                >
+                <Select value={selectedStaff} onValueChange={setSelectedStaff}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar personal" />
                   </SelectTrigger>
@@ -135,7 +149,9 @@ const MaintenanceRequestCard = ({
                       variant="outline"
                       className="w-full justify-start text-left font-normal"
                     >
-                      {format(scheduledDate, "d 'de' MMMM, yyyy", { locale: es })}
+                      {format(scheduledDate, "d 'de' MMMM, yyyy", {
+                        locale: es,
+                      })}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">

@@ -359,10 +359,7 @@ const MaintenancePage = () => {
                   </TooltipProvider>
                 </div>
                 {/* Staff Efficiency View */}
-                <StaffEfficiencyView
-                  staffMember={staff}
-                  tasks={staffTasks}
-                />
+                <StaffEfficiencyView staffMember={staff} tasks={staffTasks} />
               </Card>
             );
           })}

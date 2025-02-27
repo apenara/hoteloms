@@ -62,7 +62,7 @@ export default function Benefits() {
             Beneficios que transformarán tu operación
           </h2>
           <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-            HotelOMS revoluciona la gestión hotelera con herramientas diseñadas
+            HotelFlow revoluciona la gestión hotelera con herramientas diseñadas
             para resolver los desafíos diarios de tu establecimiento.
           </p>
         </div>

@@ -1,12 +1,12 @@
 "use client";
-import { useState } from 'react';
-import Link from 'next/link';
-import { Menu, X } from 'lucide-react';
+import { useState } from "react";
+import Link from "next/link";
+import { Menu, X } from "lucide-react";
 
 const navItems = [
-  { label: 'Características', href: '/features' },
-  { label: 'Precios', href: '/pricing' },
-  { label: 'Contacto', href: '/contact' }
+  { label: "Características", href: "/features" },
+  { label: "Precios", href: "/pricing" },
+  { label: "Contacto", href: "/contact" },
 ];
 
 export default function Navbar() {
@@ -19,7 +19,7 @@ export default function Navbar() {
           <Link href="/" className="flex items-center">
             <span className="text-2xl font-bold text-blue-600">Hotel-OMS</span>
           </Link>
-          
+
           <div className="hidden md:flex items-center space-x-6">
             {navItems.map((item) => (
               <Link
@@ -30,7 +30,7 @@ export default function Navbar() {
                 {item.label}
               </Link>
             ))}
-            
+
             {/* Botones de autenticación */}
             <Link
               href="/auth/login"
@@ -38,7 +38,7 @@ export default function Navbar() {
             >
               Iniciar Sesión
             </Link>
-            
+
             <Link
               href="/auth/register"
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
@@ -47,11 +47,15 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <button 
+          <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden"
           >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {isMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
 

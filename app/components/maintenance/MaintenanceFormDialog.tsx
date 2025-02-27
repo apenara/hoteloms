@@ -9,7 +9,7 @@ import {
   getDocs,
   Timestamp,
   updateDoc,
-  doc
+  doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import {
@@ -24,6 +24,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,8 +39,9 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "../ui/badge";
-import ImageUpload from './ImageUpload';
+import ImageUpload from "./ImageUpload";
 import { uploadMaintenanceImages } from "@/app/services/storage";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MaintenanceFormDialogProps {
   hotelId: string;
@@ -172,20 +174,23 @@ const MaintenanceFormDialog = ({
       // 3. Si hay imágenes, subirlas y actualizar el documento
       if (selectedImages && selectedImages.length > 0) {
         try {
-          console.log('Subiendo imágenes...', selectedImages);
+          console.log("Subiendo imágenes...", selectedImages);
           const imageUrls = await uploadMaintenanceImages(
             hotelId,
             newMaintenanceDoc.id,
             selectedImages
           );
 
-          console.log('URLs obtenidas:', imageUrls);
+          console.log("URLs obtenidas:", imageUrls);
 
           // 4. Actualizar el documento con las URLs de las imágenes
           if (imageUrls && imageUrls.length > 0) {
-            await updateDoc(doc(db, "hotels", hotelId, "maintenance", newMaintenanceDoc.id), {
-              images: imageUrls
-            });
+            await updateDoc(
+              doc(db, "hotels", hotelId, "maintenance", newMaintenanceDoc.id),
+              {
+                images: imageUrls,
+              }
+            );
           }
         } catch (imageError) {
           console.error("Error al subir imágenes:", imageError);
@@ -230,231 +235,188 @@ const MaintenanceFormDialog = ({
         <DialogHeader>
           <DialogTitle>Registrar Nuevo Mantenimiento</DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select
-                value={formData.type}
-                onValueChange={handleChange("type")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(MAINTENANCE_TYPES).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Categoría</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    category: value as MaintenanceCategory,
-                    roomId: "",
-                    location: "",
-                  }));
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORIES).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Ubicación</Label>
-            {formData.category === "room" ? (
+        <ScrollArea className="h-[calc(100vh-150px)]">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label>Tipo</Label>
                 <Select
-                  value={formData.roomId}
-                  onValueChange={handleChange("roomId")}
+                  value={formData.type}
+                  onValueChange={handleChange("type")}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar habitación" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {rooms.map((room) => (
-                      <SelectItem key={room.id} value={room.id}>
-                        Habitación {room.number} - Piso {room.floor}
+                    {Object.entries(MAINTENANCE_TYPES).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-
-                {formData.roomId && (
-                  <div className="mt-2 p-3 bg-gray-50 rounded-md border">
-                    {(() => {
-                      const selectedRoom = rooms.find(
-                        (r) => r.id === formData.roomId
-                      );
-                      if (!selectedRoom) return null;
-
-                      const getStatusColor = (status: string) => {
-                        const colors = {
-                          available: "bg-green-100 text-green-800",
-                          occupied: "bg-blue-100 text-blue-800",
-                          maintenance: "bg-yellow-100 text-yellow-800",
-                          cleaning: "bg-purple-100 text-purple-800",
-                        };
-                        return colors[status] || "bg-gray-100 text-gray-800";
-                      };
-
-                      const getStatusLabel = (status: string) => {
-                        const labels = {
-                          available: "Disponible",
-                          occupied: "Ocupada",
-                          maintenance: "En Mantenimiento",
-                          cleaning: "Limpieza",
-                        };
-                        return labels[status] || status;
-                      };
-
-                      return (
-                        <>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-medium">
-                                Habitación {selectedRoom.number}
-                              </h4>
-                              <p className="text-sm text-gray-500">
-                                Piso {selectedRoom.floor}
-                              </p>
-                            </div>
-                            <Badge
-                              className={getStatusColor(selectedRoom.status)}
-                            >
-                              {getStatusLabel(selectedRoom.status)}
-                            </Badge>
-                          </div>
-                          <div className="mt-2 text-sm">
-                            <div className="flex justify-between text-gray-500">
-                              <span>Última limpieza:</span>
-                              <span>
-                                {selectedRoom.lastCleaned
-                                  ? new Date(
-                                    selectedRoom.lastCleaned.seconds * 1000
-                                  ).toLocaleDateString("es-CO")
-                                  : "No registrada"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-gray-500">
-                              <span>Último mantenimiento:</span>
-                              <span>
-                                {selectedRoom.lastMaintenance
-                                  ? new Date(
-                                    selectedRoom.lastMaintenance.seconds *
-                                    1000
-                                  ).toLocaleDateString("es-CO")
-                                  : "No registrado"}
-                              </span>
-                            </div>
-                            {selectedRoom.features?.length > 0 && (
-                              <div className="mt-2">
-                                <span className="text-gray-500">
-                                  Características:
-                                </span>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {selectedRoom.features.map(
-                                    (feature, index) => (
-                                      <Badge key={index} variant="outline">
-                                        {feature}
-                                      </Badge>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
               </div>
-            ) : (
-              <Input
-                placeholder="Especificar ubicación (ej: Lobby, Piscina)"
-                value={formData.location}
-                onChange={handleChange("location")}
-                required
-              />
-            )}
-          </div>
 
-          <div className="space-y-2">
-            <Label>Asignar a</Label>
-            <Select
-              value={formData.assignedTo}
-              onValueChange={handleChange("assignedTo")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar personal de mantenimiento" />
-              </SelectTrigger>
-              <SelectContent>
-                {maintenanceStaff.map((staff) => (
-                  <SelectItem key={staff.id} value={staff.id}>
-                    {staff.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label>Categoría</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      category: value as MaintenanceCategory,
+                      roomId: "",
+                      location: "",
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CATEGORIES).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Descripción</Label>
-            <Textarea
-              placeholder="Describe el mantenimiento requerido"
-              value={formData.description}
-              onChange={handleChange("description")}
-              required
-              className="min-h-[100px]"
-            />
-          </div>
-
-          {/* Agregar el componente de carga de imágenes */}
-          <div className="space-y-2">
-            <Label>Imágenes</Label>
-            <ImageUpload
-              onImagesSelected={setSelectedImages}
-              maxImages={3}
-            />
-            <p className="text-xs text-gray-500">
-              Puedes subir hasta 3 imágenes (JPG, PNG o WebP, máx. 5MB cada una)
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Prioridad</Label>
+              <Label>Ubicación</Label>
+              {formData.category === "room" ? (
+                <div className="space-y-2">
+                  <Select
+                    value={formData.roomId}
+                    onValueChange={handleChange("roomId")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar habitación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rooms.map((room) => (
+                        <SelectItem key={room.id} value={room.id}>
+                          Habitación {room.number} - Piso {room.floor}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {formData.roomId && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded-md border">
+                      {(() => {
+                        const selectedRoom = rooms.find(
+                          (r) => r.id === formData.roomId
+                        );
+                        if (!selectedRoom) return null;
+
+                        const getStatusColor = (status: string) => {
+                          const colors = {
+                            available: "bg-green-100 text-green-800",
+                            occupied: "bg-blue-100 text-blue-800",
+                            maintenance: "bg-yellow-100 text-yellow-800",
+                            cleaning: "bg-purple-100 text-purple-800",
+                          };
+                          return colors[status] || "bg-gray-100 text-gray-800";
+                        };
+
+                        const getStatusLabel = (status: string) => {
+                          const labels = {
+                            available: "Disponible",
+                            occupied: "Ocupada",
+                            maintenance: "En Mantenimiento",
+                            cleaning: "Limpieza",
+                          };
+                          return labels[status] || status;
+                        };
+
+                        return (
+                          <>
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-medium">
+                                  Habitación {selectedRoom.number}
+                                </h4>
+                                <p className="text-sm text-gray-500">
+                                  Piso {selectedRoom.floor}
+                                </p>
+                              </div>
+                              <Badge
+                                className={getStatusColor(selectedRoom.status)}
+                              >
+                                {getStatusLabel(selectedRoom.status)}
+                              </Badge>
+                            </div>
+                            <div className="mt-2 text-sm">
+                              <div className="flex justify-between text-gray-500">
+                                <span>Última limpieza:</span>
+                                <span>
+                                  {selectedRoom.lastCleaned
+                                    ? new Date(
+                                        selectedRoom.lastCleaned.seconds * 1000
+                                      ).toLocaleDateString("es-CO")
+                                    : "No registrada"}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-gray-500">
+                                <span>Último mantenimiento:</span>
+                                <span>
+                                  {selectedRoom.lastMaintenance
+                                    ? new Date(
+                                        selectedRoom.lastMaintenance.seconds *
+                                          1000
+                                      ).toLocaleDateString("es-CO")
+                                    : "No registrado"}
+                                </span>
+                              </div>
+                              {selectedRoom.features?.length > 0 && (
+                                <div className="mt-2">
+                                  <span className="text-gray-500">
+                                    Características:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {selectedRoom.features.map(
+                                      (feature, index) => (
+                                        <Badge key={index} variant="outline">
+                                          {feature}
+                                        </Badge>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Input
+                  placeholder="Especificar ubicación (ej: Lobby, Piscina)"
+                  value={formData.location}
+                  onChange={handleChange("location")}
+                  required
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Asignar a</Label>
               <Select
-                value={formData.priority}
-                onValueChange={handleChange("priority")}
+                value={formData.assignedTo}
+                onValueChange={handleChange("assignedTo")}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccionar personal de mantenimiento" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PRIORITIES).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
+                  {maintenanceStaff.map((staff) => (
+                    <SelectItem key={staff.id} value={staff.id}>
+                      {staff.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -462,44 +424,86 @@ const MaintenanceFormDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label>Fecha Programada</Label>
-              <Input
-                type="date"
-                value={formData.scheduledFor}
-                onChange={handleChange("scheduledFor")}
+              <Label>Descripción</Label>
+              <Textarea
+                placeholder="Describe el mantenimiento requerido"
+                value={formData.description}
+                onChange={handleChange("description")}
                 required
-                min={new Date().toISOString().split("T")[0]}
+                className="min-h-[100px]"
               />
             </div>
-          </div>
 
-          {formData.category === "room" && !formData.roomId && (
-            <Alert>
-              <AlertDescription>
-                Por favor selecciona una habitación
-              </AlertDescription>
-            </Alert>
-          )}
+            {/* Agregar el componente de carga de imágenes */}
+            <div className="space-y-2">
+              <Label>Imágenes</Label>
+              <ImageUpload onImagesSelected={setSelectedImages} maxImages={3} />
+              <p className="text-xs text-gray-500">
+                Puedes subir hasta 3 imágenes (JPG, PNG o WebP, máx. 5MB cada
+                una)
+              </p>
+            </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                loading || (formData.category === "room" && !formData.roomId)
-              }
-            >
-              {loading ? "Guardando..." : "Guardar"}
-            </Button>
-          </div>
-        </form>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Prioridad</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={handleChange("priority")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(PRIORITIES).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Fecha Programada</Label>
+                <Input
+                  type="date"
+                  value={formData.scheduledFor}
+                  onChange={handleChange("scheduledFor")}
+                  required
+                  min={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+            </div>
+
+            {formData.category === "room" && !formData.roomId && (
+              <Alert>
+                <AlertDescription>
+                  Por favor selecciona una habitación
+                </AlertDescription>
+              </Alert>
+            )}
+          </form>
+        </ScrollArea>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={
+              loading || (formData.category === "room" && !formData.roomId)
+            }
+          >
+            {loading ? "Guardando..." : "Guardar"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

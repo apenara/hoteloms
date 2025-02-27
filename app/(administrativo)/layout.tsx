@@ -49,6 +49,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // State variables
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // State to control the sidebar's visibility
   const [isMobile, setIsMobile] = useState(false); // State to track if the screen is in mobile view
+  const [isTablet, setIsTablet] = useState(false);
 
   /**
    * @useEffect
@@ -57,15 +58,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
    * @listens window#resize
    */
   useEffect(() => {
-    const checkMobile = () => {
+    const checkScreenSize = () => {
       const isMobileView = window.innerWidth < 768; // Check if the screen width is less than 768px
+      const isTabletView = window.innerWidth >= 768 && window.innerWidth < 1024; // Check if it's a tablet
       setIsMobile(isMobileView); // Update the isMobile state
-      setIsSidebarOpen(!isMobileView); // Close the sidebar if in mobile view, open otherwise
+      setIsTablet(isTabletView);
+      setIsSidebarOpen(!isMobileView && !isTabletView); // Close the sidebar if in mobile or tablet view, open otherwise
     };
 
-    checkMobile(); // Check the initial state on mount
-    window.addEventListener("resize", checkMobile); // Add the event listener
-    return () => window.removeEventListener("resize", checkMobile); // Cleanup the listener on unmount
+    checkScreenSize(); // Check the initial state on mount
+    window.addEventListener("resize", checkScreenSize); // Add the event listener
+    return () => window.removeEventListener("resize", checkScreenSize); // Cleanup the listener on unmount
   }, []);
 
   /**
@@ -127,11 +130,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   /**
    * @function closeSidebar
-   * @description Closes the sidebar if the application is in mobile view.
+   * @description Closes the sidebar if the application is in mobile or tablet view.
    * @returns {void}
    */
   const closeSidebar = () => {
-    if (isMobile) {
+    if (isMobile || isTablet) {
       setIsSidebarOpen(false);
     }
   };
@@ -143,9 +146,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Overlay for closing the sidebar in mobile view */}
-      {isMobile && isSidebarOpen && (
+      {(isMobile || isTablet) && isSidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black bg-opacity-50 transition-opacity lg:hidden"
+          className="fixed inset-0 z-30 bg-black bg-opacity-50 transition-opacity duration-300 lg:hidden"
           onClick={closeSidebar}
           aria-hidden="true"
         />
@@ -153,7 +156,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen w-64 transform bg-white shadow-lg transition-transform duration-200 ease-in-out ${
+        className={`fixed left-0 top-0 z-40 h-screen w-64 transform bg-white ${
+          isMobile || isTablet ? "shadow-none" : "shadow-lg"
+        }  transition-transform duration-200 ease-in-out ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -167,7 +172,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Hotel className="h-6 w-6" />
               <span className="text-xl font-bold">HotelOMS</span>
             </Link>
-            {isMobile && (
+            {(isMobile || isTablet) && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -227,10 +232,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Main Content */}
       <div
-        className={`flex flex-col ${
+        className={`relative flex flex-col ${
           isSidebarOpen ? "lg:ml-64" : ""
         } min-h-screen transition-all duration-200`}
       >
+        {/* Overlay to content when the sidebar is open */}
+        {(isMobile || isTablet) && isSidebarOpen && (
+          <div className="fixed inset-0 z-20 bg-black bg-opacity-25 transition-opacity duration-300 lg:hidden" />
+        )}
         {/* Header */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 shadow-sm">
           <Button
@@ -249,9 +258,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Page Content */}
         <main className="flex-1">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            {children}
-          </div>
+          <div className="mx-auto px-4 py-6 sm:px-6 lg:px-8">{children}</div>
         </main>
       </div>
     </div>
