@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "roomflowapp"
-  }
+    "default": "roomflowapp",
+    "hoteloms": "roomflowapp"
+  },
+  "targets": {},
+  "etags": {}
 }

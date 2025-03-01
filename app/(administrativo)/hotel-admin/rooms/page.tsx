@@ -5,6 +5,9 @@ import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { Room } from "@/lib/types";
+import AssetCategoriesManager from "@/app/components/assets/AssetCategoriesManager";
+import AssetForm from "@/app/components/assets/AssetForm";
+import AssetsList from "@/app/components/assets/AssetsList";
 
 export default function HotelAdminRoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -35,15 +38,10 @@ export default function HotelAdminRoomsPage() {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">
         Administración de Habitaciones
-      </h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {rooms.map((room) => (
-          <div key={room.id} className="border p-4 rounded-lg">
-            <h2 className="text-lg font-semibold">Habitación {room.number}</h2>
-            <p>Estado: {room.status}</p>
-          </div>
-        ))}
-      </div>
+        </h1>
+       <AssetCategoriesManager/>
+       <AssetsList/>
+
     </div>
   );
 }
