@@ -21,6 +21,7 @@ import { RoomHistoryTab } from '@/app/components/staff/RoomHistoryTab';
 import type { Room } from '@/app/lib/types';
 import { uploadMaintenanceImages } from '@/app/services/storage';
 import { registrarCambioEstado } from '@/app/services/housekeeping';
+import { RoomHistoryTabs } from '@/app/components/history/RoomHistoryTabs';
 
 /**
  * @function StaffRoomView
@@ -433,11 +434,11 @@ export default function StaffRoomView() {
             </TabsContent>
             {/* History tab */}
             <TabsContent value="history">
-              <RoomHistoryTab historyEntries={historyEntries} />
+            <RoomHistoryTabs roomId={params.roomId} hotelId={params.hotelId} />
             </TabsContent>
           </Tabs>
         </CardContent>
-      </Card>
+      </Card> 
 
       {/* Error Dialog */}
       <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>

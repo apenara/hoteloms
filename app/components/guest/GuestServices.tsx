@@ -4,6 +4,10 @@ import { Paintbrush, Waves, MessageSquare } from 'lucide-react';
 import { addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { sendGuestRequestNotification } from '@/app/services/guestNotificationService';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 interface GuestServicesProps {
   room: any;
@@ -14,15 +18,17 @@ interface GuestServicesProps {
 }
 
 export function GuestServices({ room, hotelId, roomId, onShowMessage, onSuccess }: GuestServicesProps) {
-  const handleStatusChange = async (newStatus: string) => {
+  const [isRequestingTowels, setIsRequestingTowels] = useState(false);
+  const [towelsQuantity, setTowelsQuantity] = useState<number | null>(null);
+
+  const handleStatusChange = async (newStatus: string, quantity?: number) => {
     if (!hotelId || !roomId) return;
   
     try {
       const timestamp = new Date();
       const requestsRef = collection(db, 'hotels', hotelId, 'requests');
   
-      // Crear solicitud con más detalles
-      await addDoc(requestsRef, {
+      const requestData = {
         roomId,
         roomNumber: room?.number,
         type: newStatus,
@@ -33,9 +39,17 @@ export function GuestServices({ room, hotelId, roomId, onShowMessage, onSuccess 
         details: {
           previousStatus: room?.status,
           requestType: 'guest_initiated',
-          guestRequest: true
-        }
-      });
+          guestRequest: true,
+        },
+      } as any;
+
+      // Agregar la cantidad de toallas si se proporciona
+      if (quantity !== undefined) {
+        requestData.towelsQuantity = quantity;
+      }
+  
+      // Crear solicitud con más detalles
+      await addDoc(requestsRef, requestData);
   
       // Registrar en historial
       const historyRef = collection(db, 'hotels', hotelId, 'rooms', roomId, 'history');
@@ -44,7 +58,7 @@ export function GuestServices({ room, hotelId, roomId, onShowMessage, onSuccess 
         requestType: newStatus,
         timestamp,
         source: 'guest',
-        notes: `Solicitud de huésped: ${newStatus}`,
+        notes: `Solicitud de huésped: ${newStatus}${quantity ? ` - Cantidad: ${quantity}` : ''}`,
         room: {
           number: room?.number,
           id: room?.id
@@ -56,14 +70,21 @@ export function GuestServices({ room, hotelId, roomId, onShowMessage, onSuccess 
         type: newStatus,
         hotelId,
         roomNumber: room.number,
-        roomId
+        roomId,
       });
   
       onSuccess('Solicitud enviada correctamente');
     } catch (error) {
       console.error('Error:', error);
       throw new Error('Error al procesar la solicitud');
+    } finally {
+      setIsRequestingTowels(false)
+      setTowelsQuantity(null);
     }
+  };
+
+  const handleRequestTowels = () => {
+    setIsRequestingTowels(true);
   };
 
   return (
@@ -71,7 +92,7 @@ export function GuestServices({ room, hotelId, roomId, onShowMessage, onSuccess 
       <Button
         className="flex flex-col items-center p-6 h-auto"
         variant="outline"
-        onClick={() => handleStatusChange('need_cleaning')}
+        onClick={() => handleStatusChange('Necesita Limpieza')}
       >
         <Paintbrush className="h-8 w-8 mb-2" />
         <span>Solicitar Limpieza</span>
@@ -83,7 +104,7 @@ export function GuestServices({ room, hotelId, roomId, onShowMessage, onSuccess 
       <Button
         className="flex flex-col items-center p-6 h-auto"
         variant="outline"
-        onClick={() => handleStatusChange('need_towels')}
+        onClick={handleRequestTowels}
       >
         <Waves className="h-8 w-8 mb-2" />
         <span>Solicitar Toallas</span>
@@ -103,6 +124,42 @@ export function GuestServices({ room, hotelId, roomId, onShowMessage, onSuccess 
           Contactar a recepción
         </span>
       </Button>
+
+      {/* Dialog for Towel Quantity */}
+      <Dialog open={isRequestingTowels} onOpenChange={setIsRequestingTowels}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cuántas toallas necesita?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="towels">Cantidad de toallas</Label>
+              <Input
+                id="towels"
+                type="number"
+                min={1}
+                value={towelsQuantity !== null ? towelsQuantity : ''}
+                onChange={(e) => setTowelsQuantity(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (towelsQuantity && towelsQuantity == 1) {
+                  handleStatusChange('Necesita ' + towelsQuantity + ' Toalla adicional' );
+                } else if (towelsQuantity && towelsQuantity > 1) {
+                  handleStatusChange('Necesita ' + towelsQuantity + ' Toallas adicionales', towelsQuantity);
+                } else {
+                  setIsRequestingTowels(false);
+                }
+              }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { ROOM_STATES } from '@/app/lib/constants/room-states';
 import { Loader2 } from "lucide-react";
+import { RoomHistoryTabs } from "../history/RoomHistoryTabs";
 
 interface RoomDetailDialogProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export function RoomDetailDialog({ isOpen, onClose, room, hotelId }: RoomDetailD
   const [historial, setHistorial] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [staffCache, setStaffCache] = useState<Record<string, any>>({});
+  const [lastCleaningDate, setLastCleaningDate] = useState<Date | null>(null); // New state variable
 
   // Función para obtener la información del staff
   const fetchStaffInfo = async (staffId: string) => {
@@ -68,7 +70,7 @@ export function RoomDetailDialog({ isOpen, onClose, room, hotelId }: RoomDetailD
         const historialRef = collection(db, 'hotels', hotelId, 'rooms', room.id, 'history');
         const q = query(historialRef, orderBy('timestamp', 'desc'));
         const snapshot = await getDocs(q);
-        
+
         const historialData = await Promise.all(snapshot.docs.map(async (doc) => {
           const data = doc.data();
           const entry: HistoryEntry = {
@@ -96,6 +98,17 @@ export function RoomDetailDialog({ isOpen, onClose, room, hotelId }: RoomDetailD
         }));
 
         setHistorial(historialData);
+
+        // Find the last cleaning date
+        const lastCleaningEntry = historialData.find(entry => {
+          return entry.newStatus && (entry.newStatus.startsWith("clean") || entry.newStatus === "dirty");
+        });
+
+        if (lastCleaningEntry) {
+          setLastCleaningDate(lastCleaningEntry.timestamp);
+        } else {
+          setLastCleaningDate(null);
+        }
       } catch (error) {
         console.error('Error al cargar historial:', error);
       } finally {
@@ -135,56 +148,15 @@ export function RoomDetailDialog({ isOpen, onClose, room, hotelId }: RoomDetailD
                 <p className="font-semibold">Tipo:</p>
                 <p>{room.type}</p>
               </div>
-              <div className="space-y-2">
-                <p className="font-semibold">Última Limpieza:</p>
-                <p>{room.lastCleaning ? new Date(room.lastCleaning).toLocaleString() : 'N/A'}</p>
-              </div>
+              {/* <div className="space-y-2">
+                <p className="font-semibold">Último Estado </p>
+                <p>{ROOM_STATES[entry.previousStatus]?.label || entry.previousStatus}</p>
+              </div> */}
             </div>
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
-            <ScrollArea className="h-[500px]">
-              {loading ? (
-                <div className="flex justify-center items-center h-20">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Estado Anterior</TableHead>
-                      <TableHead>Nuevo Estado</TableHead>
-                      <TableHead>Usuario</TableHead>
-                      <TableHead>Notas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {historial.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{entry.timestamp?.toLocaleString()}</TableCell>
-                        <TableCell>{ROOM_STATES[entry.previousStatus]?.label || entry.previousStatus}</TableCell>
-                        <TableCell>{ROOM_STATES[entry.newStatus]?.label || entry.newStatus}</TableCell>
-                        <TableCell>
-                          {entry.staffInfo ? (
-                            <div className="text-sm">
-                              <div className="font-medium">{entry.staffInfo.name}</div>
-                              <div className="text-xs text-gray-500">
-                                {entry.staffInfo.role}
-                                {entry.staffInfo.accessType && ` (${entry.staffInfo.accessType})`}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-500">Sistema</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{entry.notes}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </ScrollArea>
+          <RoomHistoryTabs roomId={room.id} hotelId={hotelId} />
           </TabsContent>
         </Tabs>
       </DialogContent>

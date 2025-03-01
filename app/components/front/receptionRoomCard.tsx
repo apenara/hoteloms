@@ -27,6 +27,7 @@ import { RoomProgressTimer } from '../hotels/RoomProgressTimer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { RoomHistory } from './RoomHistory';
 import RoomNotificationBadge from './roomNotificationBadge';
+import { RoomHistoryTabs } from '../history/RoomHistoryTabs';
 
 interface ReceptionRoomCardProps {
   room: {
@@ -319,10 +320,10 @@ export function ReceptionRoomCard({ room, hotelId, currentUser }: ReceptionRoomC
             </TabsContent>
 
             <TabsContent value="history" className="mt-4">
-              <RoomHistory roomId={room.id} hotelId={hotelId} />
+            <RoomHistoryTabs roomId={room.id} hotelId={hotelId} />
             </TabsContent>
           </Tabs>
-        </DialogContent>
+        </DialogContent> 
       </Dialog>
 
       {/* Modal de solicitudes */}
