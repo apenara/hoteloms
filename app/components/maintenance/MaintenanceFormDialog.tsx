@@ -177,6 +177,7 @@ const MaintenanceFormDialog = ({
           console.log("Subiendo imágenes...", selectedImages);
           const imageUrls = await uploadMaintenanceImages(
             hotelId,
+            formData.roomId,
             newMaintenanceDoc.id,
             selectedImages
           );
