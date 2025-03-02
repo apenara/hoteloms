@@ -57,7 +57,7 @@ export default function LoginPage() {
           return {
             hotelId: hotelDoc.id,
             staffData: staffSnapshot.docs[0].data(),
-            staffId: staffSnapshot.docs[0].id
+            staffId: staffSnapshot.docs[0].id,
           };
         }
       }
@@ -72,28 +72,51 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-  
+
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         loginData.email,
         loginData.password
       );
-  
+
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
       const userData = userDoc.data();
-  
+
       if (!userData) {
         throw new Error("No se encontraron datos del usuario");
       }
-  
+
       // Registrar token FCM con información completa
-      await registerUserToken(
+      const fcmToken = await registerUserToken(
         userCredential.user.uid,
-        userData.hotelId || 'admin',
+        userData.hotelId || "admin",
         userData.role,
-        'email' // Agregar método de autenticación
+        "email" // Agregar método de autenticación
       );
+
+      // Guardar datos en localStorage/sessionStorage para mantener consistencia
+      const authData = {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        ...userData,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Para asegurar la persistencia de la sesión entre cargas y middleware
+      localStorage.setItem("authUser", JSON.stringify(authData));
+      sessionStorage.setItem("authUser", JSON.stringify(authData));
+
+      // Guardamos el token de autenticación en una cookie para que middleware pueda verificarla
+      document.cookie = `authToken=${userCredential.user.uid}; path=/; max-age=28800; SameSite=Lax`;
+
+      // Si hay token FCM, también lo guardamos en cookie
+      if (fcmToken) {
+        document.cookie = `firebase-token=${fcmToken}; path=/; max-age=28800; SameSite=Lax`;
+      }
+
+      // Establecer marca de tiempo de inicio de sesión
+      document.cookie = `sessionStart=${Date.now()}; path=/; max-age=28800; SameSite=Lax`;
 
       // Redireccionar según el rol
       if (userData.role === "super_admin") {
@@ -115,11 +138,11 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-  
+
     try {
       let targetHotelId = hotelId;
       let staffInfo = null;
-  
+
       if (!targetHotelId) {
         staffInfo = await handlePinSearch(pin);
         if (!staffInfo) {
@@ -127,16 +150,30 @@ export default function LoginPage() {
         }
         targetHotelId = staffInfo.hotelId;
       }
-  
+
       const staffMember = await loginWithPin(pin, targetHotelId, requiredRole);
-  
+
       // Registrar token FCM con la información correcta del staff
-      await registerUserToken(
+      const fcmToken = await registerUserToken(
         staffMember.id,
         targetHotelId,
         staffMember.role,
-        'pin' // Agregar método de autenticación
+        "pin" // Agregar método de autenticación
       );
+
+      // Guardamos las cookies necesarias para el middleware
+      document.cookie = `staffAccess=${staffMember.id}; path=/; max-age=28800; SameSite=Lax`;
+      document.cookie = `sessionStart=${Date.now()}; path=/; max-age=28800; SameSite=Lax`;
+
+      // Si hay token FCM, también lo guardamos en cookie
+      if (fcmToken) {
+        document.cookie = `firebase-token=${fcmToken}; path=/; max-age=28800; SameSite=Lax`;
+      }
+
+      // Creamos un respaldo adicional de información de staff para mayor seguridad
+      const staffCacheKey = `staff_data_${staffMember.id}`;
+      sessionStorage.setItem(staffCacheKey, JSON.stringify(staffMember));
+
       // Construir la URL de redirección según el rol
       let redirectUrl = "";
       switch (staffMember.role) {
@@ -154,7 +191,7 @@ export default function LoginPage() {
       }
 
       // Esperar un momento para asegurar que la sesión se guardó
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       window.location.href = redirectUrl;
     } catch (error) {
