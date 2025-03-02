@@ -1,31 +1,38 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function RoomNotificationBadge() {
-  return () => {
-    const [isVisible, setIsVisible] = useState(true);
+interface RoomNotificationBadgeProps {
+  isVisible: boolean;
+}
 
-    useEffect(() => {
-      const timer = setInterval(() => {
-        setIsVisible(prev => !prev);
-      }, 2000);
+export default function RoomNotificationBadge({
+  isVisible,
+}: RoomNotificationBadgeProps) {
+  const [isPulsing, setIsPulsing] = useState(true);
 
-      return () => clearInterval(timer); 
-    }, []);
+  useEffect(() => {
+    if (!isVisible) return;
 
-    return (
-      <AnimatePresence>
-        {isVisible && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full"
-          />
-        )}
-      </AnimatePresence>
-    );
-  };
+    const timer = setInterval(() => {
+      setIsPulsing((prev) => !prev);
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [isVisible]);
+
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: isPulsing ? 1 : 0.8, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full"
+        />
+      )}
+    </AnimatePresence>
+  );
 }
