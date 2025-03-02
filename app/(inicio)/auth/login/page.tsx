@@ -183,6 +183,9 @@ export default function LoginPage() {
         case "maintenance":
           redirectUrl = `/maintenance/${staffMember.hotelId}/staff`;
           break;
+        case "housekeeping":
+          redirectUrl = `/housekeeping/${staffMember.hotelId}/staff`;
+          break;
         case "hotel_admin":
           redirectUrl = "/hotel-admin/dashboard";
           break;

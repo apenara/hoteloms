@@ -12,6 +12,7 @@ import {
 import { db } from "@/lib/firebase/config";
 import type { Staff, Room } from "@/app/lib/types";
 import { startOfDay, endOfDay } from "date-fns";
+import { convertToDate } from "@/app/lib/utils/housekeeping";
 
 interface UseRealTimeHousekeepingProps {
   hotelId: string;
@@ -59,7 +60,10 @@ export const useRealTimeHousekeeping = ({
       // Filtrar habitaciones del día
       const habitacionesDelDia = habitacionesFiltradas.filter((h) => {
         if (!h.lastStatusChange) return false;
-        const fecha = h.lastStatusChange.toDate();
+
+        const fecha = convertToDate(h.lastStatusChange);
+        if (!fecha) return false;
+
         return fecha >= startOfSelectedDay && fecha <= endOfSelectedDay;
       });
 
