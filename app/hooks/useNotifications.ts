@@ -19,7 +19,24 @@ export function useNotifications() {
   }, []);
 
   useEffect(() => {
+    // Verificar si estamos en una vista pública
+    const isPublicView =
+      window.location.pathname.includes("/rooms/") ||
+      window.location.pathname.includes("/housekeeping/");
+
+    // No solicitar notificaciones en vistas públicas
+    if (isPublicView) {
+      return;
+    }
+
     const requestPermission = async () => {
+      // Verificar si ya tenemos un token en sessionStorage
+      const cachedToken = sessionStorage.getItem("fcm_user_token");
+      if (cachedToken) {
+        setToken(cachedToken);
+        return;
+      }
+
       try {
         const permission = await Notification.requestPermission();
         setNotificationPermission(permission);
@@ -39,12 +56,15 @@ export function useNotifications() {
       if (!user) return;
       try {
         const currentToken = await getToken(messaging, {
-          vapidKey: "BO-PNClIUSFDsAayx_acyc7FYSkwpYpvYyEbhwQUn7SWIRQDHcjYzGnr8uhN66KDy4iLiCTtTgrsmbR3v1cVt3c", // Reemplaza con tu VAPID Key
+          vapidKey:
+            "BO-PNClIUSFDsAayx_acyc7FYSkwpYpvYyEbhwQUn7SWIRQDHcjYzGnr8uhN66KDy4iLiCTtTgrsmbR3v1cVt3c", // Reemplaza con tu VAPID Key
         });
 
         if (currentToken) {
           console.log("FCM Token:", currentToken);
           setToken(currentToken);
+          // Guardar en sessionStorage
+          sessionStorage.setItem("fcm_user_token", currentToken);
           await saveTokenToFirestore(currentToken);
         } else {
           console.warn(
@@ -62,16 +82,19 @@ export function useNotifications() {
         // Muestra una notificación en primer plano
         toast({
           title: payload.notification?.title || "Nueva Notificación",
-          description: payload.notification?.body || "Tienes una nueva notificación.",
+          description:
+            payload.notification?.body || "Tienes una nueva notificación.",
         });
       });
     };
 
-    if (user && notificationPermission === "granted") {
-      getFcmToken();
-      setupMessageHandler();
-    } else {
-      requestPermission();
+    if (!isPublicView) {
+      if (user && notificationPermission === "granted") {
+        getFcmToken();
+        setupMessageHandler();
+      } else if (user) {
+        requestPermission();
+      }
     }
 
     return () => {};

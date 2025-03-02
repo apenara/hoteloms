@@ -3,24 +3,24 @@
 //se importan los hooks de react y de next para la navegacion y los parametros de la url
 //se importan los hooks de autenticacion y los componentes de la aplicacion
 
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
-import { GuestServices } from '@/app/components/guest/GuestServices';
-import { StaffAccessSection } from '@/app/components/guest/StaffAccessSection';
-import { MessageDialog } from '@/app/components/guest/MessageDialog';
-import { PinLogin } from '@/components/staff/PinLogin';
-import StaffLoginDialog from '@/components/staff/StaffLoginDialog';
-import { hasPermission } from '@/app/lib/constants/permissions';
-import { logAccess } from '@/app/services/access-logs';
-import { sendGuestRequestNotification } from '@/app/services/guestNotificationService';
-import { Staff, Hotel, Room } from '@/app/lib/types';
+import { useState, useEffect } from "react";
+import { doc, getDoc, addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { GuestServices } from "@/app/components/guest/GuestServices";
+import { StaffAccessSection } from "@/app/components/guest/StaffAccessSection";
+import { MessageDialog } from "@/app/components/guest/MessageDialog";
+import { PinLogin } from "@/components/staff/PinLogin";
+import StaffLoginDialog from "@/components/staff/StaffLoginDialog";
+import { hasPermission } from "@/app/lib/constants/permissions";
+import { logAccess } from "@/app/services/access-logs";
+import { sendGuestRequestNotification } from "@/app/services/guestNotificationService";
+import { Staff, Hotel, Room } from "@/app/lib/types";
 
 /**
  * @function PublicRoomView
@@ -44,7 +44,7 @@ export default function PublicRoomView() {
    * @property {string} hotelId - The ID of the hotel.
    * @property {string} roomId - The ID of the room.
    */
-  const params = useParams<{ hotelId: string, roomId: string }>();
+  const params = useParams<{ hotelId: string; roomId: string }>();
 
   /**
    * @const useAuth
@@ -87,7 +87,7 @@ export default function PublicRoomView() {
    * @description State variable to store a success message to display to the user after an action.
    * @type {string}
    */
-  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>("");
 
   /**
    * @const showMessageDialog
@@ -115,13 +115,11 @@ export default function PublicRoomView() {
    * @description State variable to store the message input by the guest in the message dialog.
    * @type {string}
    */
-  const [message, setMessage] = useState<string>('');
+  const [message, setMessage] = useState<string>("");
 
   /**
    * @useEffect
-   * @description Fetches the room and hotel data when the component mounts or the URL parameters change.
-   * @dependency params.hotelId - changes when the hotel id changes
-   * @dependency params.roomId - changes when the room id changes
+   * @description Fetches the room and hotel data when the component mounts.
    * @returns {void}
    */
   useEffect(() => {
@@ -132,29 +130,75 @@ export default function PublicRoomView() {
       try {
         setLoading(true);
 
-        // Fetch hotel data
-        const hotelDoc = await getDoc(doc(db, 'hotels', params.hotelId));
-        if (!hotelDoc.exists()) {
-          throw new Error('Hotel no encontrado');
-        }
-        setHotel({ id: hotelDoc.id, ...hotelDoc.data() } as Hotel);
+        // Intentar cargar desde sessionStorage primero
+        const cachedRoomKey = `room_${params.hotelId}_${params.roomId}`;
+        const cachedHotelKey = `hotel_${params.hotelId}`;
+        const cachedRoom = sessionStorage.getItem(cachedRoomKey);
+        const cachedHotel = sessionStorage.getItem(cachedHotelKey);
 
-        // Fetch room data
-        const roomDoc = await getDoc(doc(db, 'hotels', params.hotelId, 'rooms', params.roomId));
-        if (!roomDoc.exists()) {
-          throw new Error('Habitación no encontrada');
+        // Si ambos datos están en caché, usarlos inmediatamente
+        if (cachedRoom && cachedHotel) {
+          setRoom(JSON.parse(cachedRoom));
+          setHotel(JSON.parse(cachedHotel));
+          setLoading(false);
+
+          // Aún así cargar datos frescos en segundo plano
+          loadFreshData();
+          return;
         }
-        setRoom({ id: roomDoc.id, ...roomDoc.data() } as Room);
+
+        // Si no hay caché, cargar normalmente
+        await loadFreshData();
       } catch (error: any) {
-        console.error('Error:', error);
+        console.error("Error:", error);
         setError(error.message);
       } finally {
         setLoading(false);
       }
     };
 
+    // Función para cargar datos frescos de Firebase
+    const loadFreshData = async () => {
+      try {
+        // Fetch hotel data
+        const hotelDoc = await getDoc(doc(db, "hotels", params.hotelId));
+        if (!hotelDoc.exists()) {
+          throw new Error("Hotel no encontrado");
+        }
+        const hotelData = { id: hotelDoc.id, ...hotelDoc.data() } as Hotel;
+
+        // Fetch room data
+        const roomDoc = await getDoc(
+          doc(db, "hotels", params.hotelId, "rooms", params.roomId)
+        );
+        if (!roomDoc.exists()) {
+          throw new Error("Habitación no encontrada");
+        }
+        const roomData = { id: roomDoc.id, ...roomDoc.data() } as Room;
+
+        // Guardar en sessionStorage
+        sessionStorage.setItem(
+          `room_${params.hotelId}_${params.roomId}`,
+          JSON.stringify(roomData)
+        );
+        sessionStorage.setItem(
+          `hotel_${params.hotelId}`,
+          JSON.stringify(hotelData)
+        );
+
+        // Actualizar estado
+        setHotel(hotelData);
+        setRoom(roomData);
+
+        return { hotelData, roomData };
+      } catch (error) {
+        console.error("Error cargando datos frescos:", error);
+        throw error;
+      }
+    };
+
     fetchRoomData();
-  }, [params.hotelId, params.roomId]);
+  }, []);
 
   /**
    * @function handleStaffAccess
@@ -167,48 +211,103 @@ export default function PublicRoomView() {
    */
   const handleStaffAccess = async (staffMember: Staff) => {
     try {
+      setLoading(true);
+      setError(null);
+
       // Permission check
-      if (!hasPermission(staffMember.role, 'canChangeRoomStatus')) {
-        throw new Error('No tienes permisos para acceder a esta sección');
+      if (!hasPermission(staffMember.role, "canChangeRoomStatus")) {
+        throw new Error("No tienes permisos para acceder a esta sección");
       }
 
-      // Staff access object
+      // Staff access object - incluimos toda la información del staff para que esté disponible
       const staffAccess = {
+        ...staffMember, // Incluir todos los campos del staffMember
         id: staffMember.id,
-        userId: staffMember.userId,
+        userId: staffMember.userId || staffMember.id, // asegurar que userId esté presente
         name: staffMember.name,
         role: staffMember.role,
         hotelId: params.hotelId,
-        type: 'staff',
-        accessType: 'pin',
-        timestamp: new Date().toISOString()
+        type: "staff",
+        accessType: "pin",
+        timestamp: new Date().toISOString(),
       };
 
-      // Store in localStorage
-      localStorage.setItem('staffAccess', JSON.stringify(staffAccess));
+      // Guardar en localStorage con toda la información
+      localStorage.setItem("staffAccess", JSON.stringify(staffAccess));
 
-      // Store in sessionStorage
-      sessionStorage.setItem('currentStaffSession', JSON.stringify({
+      // Guardar en sessionStorage de forma más completa
+      const sessionData = {
         ...staffAccess,
-        sessionStart: new Date().toISOString()
-      }));
+        sessionStart: new Date().toISOString(),
+      };
+
+      // Asegurarnos que la información del staff esté completa
+      sessionStorage.setItem(
+        "currentStaffSession",
+        JSON.stringify(sessionData)
+      );
+
+      // Guardar también como una copia separada para mayor seguridad
+      sessionStorage.setItem(
+        `staff_data_${staffMember.id}`,
+        JSON.stringify(staffMember)
+      );
 
       // Log access
       await logAccess({
         userId: staffMember.id,
         userName: staffMember.name,
         role: staffMember.role,
-        accessType: 'pin',
+        accessType: "pin",
         hotelId: params.hotelId,
         roomId: params.roomId,
-        action: 'room_access'
+        action: "room_access",
       });
+
+      // Pre-cargar los datos de la habitación y del hotel para la siguiente página
+      // Asegurarnos de que estos datos estén en sessionStorage antes de redirigir
+      try {
+        if (!room || !hotel) {
+          // Cargar los datos si no están disponibles
+          const { hotelData, roomData } = await loadFreshData();
+
+          // Guardar para uso en la siguiente página
+          sessionStorage.setItem(
+            `room_${params.hotelId}_${params.roomId}`,
+            JSON.stringify(roomData || room)
+          );
+          sessionStorage.setItem(
+            `hotel_${params.hotelId}`,
+            JSON.stringify(hotelData || hotel)
+          );
+
+          // Esperar un momento para asegurar que los datos se hayan guardado
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        } else {
+          // Si ya tenemos los datos, asegurémonos de que estén en sessionStorage
+          sessionStorage.setItem(
+            `room_${params.hotelId}_${params.roomId}`,
+            JSON.stringify(room)
+          );
+          sessionStorage.setItem(
+            `hotel_${params.hotelId}`,
+            JSON.stringify(hotel)
+          );
+
+          // Esperar un momento para asegurar que los datos se hayan guardado
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      } catch (preloadError) {
+        console.error("Error pre-cargando datos:", preloadError);
+        // Continuamos incluso si hay un error en la precarga
+      }
 
       // Redirect to staff room view
       router.push(`/rooms/${params.hotelId}/${params.roomId}/staff`);
     } catch (error: any) {
-      console.error('Error en acceso de staff:', error);
+      console.error("Error en acceso de staff:", error);
       setError(error.message);
+      setLoading(false);
     }
   };
 
@@ -223,9 +322,12 @@ export default function PublicRoomView() {
    */
   const handleLoginSuccess = async (user: any) => {
     try {
+      setLoading(true);
+      setError(null);
+
       // Permission check for administrative users
-      if (!hasPermission(user.role, 'canAccessOperationalPages')) {
-        throw new Error('No tienes permisos para acceder a esta sección');
+      if (!hasPermission(user.role, "canAccessOperationalPages")) {
+        throw new Error("No tienes permisos para acceder a esta sección");
       }
 
       // Log access
@@ -233,17 +335,56 @@ export default function PublicRoomView() {
         userId: user.id,
         userName: user.name,
         role: user.role,
-        accessType: 'email',
+        accessType: "email",
         hotelId: params.hotelId,
         roomId: params.roomId,
-        action: 'room_access'
+        action: "room_access",
       });
+
+      // Pre-cargar los datos de la habitación y del hotel para la siguiente página
+      // Asegurarnos de que estos datos estén en sessionStorage antes de redirigir
+      try {
+        if (!room || !hotel) {
+          // Cargar los datos si no están disponibles
+          const { hotelData, roomData } = await loadFreshData();
+
+          // Guardar para uso en la siguiente página
+          sessionStorage.setItem(
+            `room_${params.hotelId}_${params.roomId}`,
+            JSON.stringify(roomData || room)
+          );
+          sessionStorage.setItem(
+            `hotel_${params.hotelId}`,
+            JSON.stringify(hotelData || hotel)
+          );
+
+          // Esperar un momento para asegurar que los datos se hayan guardado
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        } else {
+          // Si ya tenemos los datos, asegurémonos de que estén en sessionStorage
+          sessionStorage.setItem(
+            `room_${params.hotelId}_${params.roomId}`,
+            JSON.stringify(room)
+          );
+          sessionStorage.setItem(
+            `hotel_${params.hotelId}`,
+            JSON.stringify(hotel)
+          );
+
+          // Esperar un momento para asegurar que los datos se hayan guardado
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      } catch (preloadError) {
+        console.error("Error pre-cargando datos:", preloadError);
+        // Continuamos incluso si hay un error en la precarga
+      }
 
       // Redirect to staff room view
       router.push(`/rooms/${params.hotelId}/${params.roomId}/staff`);
     } catch (error: any) {
-      console.error('Error en login:', error);
+      console.error("Error en login:", error);
       setError(error.message);
+      setLoading(false);
     }
   };
 
@@ -260,33 +401,33 @@ export default function PublicRoomView() {
 
     try {
       // Create request
-      const requestsRef = collection(db, 'hotels', params.hotelId, 'requests');
+      const requestsRef = collection(db, "hotels", params.hotelId, "requests");
       await addDoc(requestsRef, {
         roomId: params.roomId,
         roomNumber: room.number,
         message,
-        status: 'pending',
+        status: "pending",
         createdAt: new Date(),
-        type: 'guest_request'
+        type: "guest_request",
       });
 
       // Send notification
       await sendGuestRequestNotification({
-        type: 'guest_request',
+        type: "guest_request",
         hotelId: params.hotelId,
         roomNumber: room.number,
         roomId: params.roomId,
-        message: message.substring(0, 100)
+        message: message.substring(0, 100),
       });
 
       // Reset state and show success message
-      setMessage('');
+      setMessage("");
       setShowMessageDialog(false);
-      setSuccessMessage('Mensaje enviado correctamente');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setSuccessMessage("Mensaje enviado correctamente");
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error: any) {
-      console.error('Error:', error);
-      setError('Error al enviar el mensaje');
+      console.error("Error:", error);
+      setError("Error al enviar el mensaje");
     }
   };
 
@@ -333,7 +474,9 @@ export default function PublicRoomView() {
     <div className="p-4 max-w-md mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">{hotel.name} - Habitación {room.number}</CardTitle>
+          <CardTitle className="text-xl">
+            {hotel.name} - Habitación {room.number}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Success message alert */}
@@ -350,7 +493,7 @@ export default function PublicRoomView() {
             onShowMessage={() => setShowMessageDialog(true)}
             onSuccess={(message) => {
               setSuccessMessage(message);
-              setTimeout(() => setSuccessMessage(''), 3000);
+              setTimeout(() => setSuccessMessage(""), 3000);
             }}
           />
 

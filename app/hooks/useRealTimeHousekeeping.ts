@@ -119,16 +119,92 @@ export const useRealTimeHousekeeping = ({
     [selectedDate]
   );
 
-  // Efecto para las suscripciones en tiempo real
-  useEffect(() => {
+  // Función para cargar datos iniciales (una sola vez)
+  const fetchInitialData = useCallback(async () => {
     if (!hotelId) {
       setError("Hotel ID no proporcionado");
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Verificar si hay datos en sessionStorage
+      const cachedRoomsKey = `rooms_${hotelId}`;
+      const cachedStaffKey = `staff_housekeeper_${hotelId}`;
+      const cachedRooms = sessionStorage.getItem(cachedRoomsKey);
+      const cachedStaff = sessionStorage.getItem(cachedStaffKey);
+      const cacheTimestamp = sessionStorage.getItem(
+        `${cachedRoomsKey}_timestamp`
+      );
+
+      // Si hay datos en cache y tienen menos de 5 minutos, usarlos
+      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+      if (cachedRooms && cachedStaff && cacheTimestamp) {
+        const timestamp = parseInt(cacheTimestamp);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          setHabitaciones(JSON.parse(cachedRooms));
+          setCamareras(JSON.parse(cachedStaff));
+          setLoading(false);
+
+          // Aún así iniciar las suscripciones en tiempo real
+          startRealTimeSubscriptions();
+          return;
+        }
+      }
+
+      // Obtener datos de camareras
+      const staffRef = collection(db, "hotels", hotelId, "staff");
+      const staffQuery = query(
+        staffRef,
+        where("role", "==", "housekeeper"),
+        where("status", "==", "active"),
+        orderBy("name")
+      );
+
+      const staffSnapshot = await getDocs(staffQuery);
+      const staffData = staffSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Staff[];
+
+      // Obtener datos de habitaciones
+      const roomsRef = collection(db, "hotels", hotelId, "rooms");
+      const roomsQuery = query(roomsRef);
+      const roomsSnapshot = await getDocs(roomsQuery);
+      const roomsData = roomsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Room[];
+
+      // Actualizar el estado
+      setCamareras(staffData);
+      setHabitaciones(roomsData);
+
+      // Guardar en sessionStorage
+      sessionStorage.setItem(cachedStaffKey, JSON.stringify(staffData));
+      sessionStorage.setItem(cachedRoomsKey, JSON.stringify(roomsData));
+      sessionStorage.setItem(
+        `${cachedRoomsKey}_timestamp`,
+        Date.now().toString()
+      );
+
+      setLoading(false);
+
+      // Iniciar las suscripciones en tiempo real
+      startRealTimeSubscriptions();
+    } catch (error) {
+      console.error("Error al cargar datos iniciales:", error);
+      setError("Error al cargar datos iniciales");
+      setLoading(false);
+    }
+  }, [hotelId]);
+
+  // Función para iniciar suscripciones en tiempo real
+  const startRealTimeSubscriptions = useCallback(() => {
+    if (!hotelId) return;
 
     // Queries
     const staffRef = collection(db, "hotels", hotelId, "staff");
@@ -151,6 +227,12 @@ export const useRealTimeHousekeeping = ({
           ...doc.data(),
         })) as Staff[];
         setCamareras(staffData);
+
+        // Actualizar cache
+        sessionStorage.setItem(
+          `staff_housekeeper_${hotelId}`,
+          JSON.stringify(staffData)
+        );
       },
       (error) => {
         console.error("Error en snapshot de camareras:", error);
@@ -166,12 +248,18 @@ export const useRealTimeHousekeeping = ({
           ...doc.data(),
         })) as Room[];
         setHabitaciones(roomsData);
-        setLoading(false);
+
+        // Actualizar cache
+        const cachedRoomsKey = `rooms_${hotelId}`;
+        sessionStorage.setItem(cachedRoomsKey, JSON.stringify(roomsData));
+        sessionStorage.setItem(
+          `${cachedRoomsKey}_timestamp`,
+          Date.now().toString()
+        );
       },
       (error) => {
         console.error("Error en snapshot de habitaciones:", error);
         setError("Error al obtener datos de habitaciones");
-        setLoading(false);
       }
     );
 
@@ -180,6 +268,11 @@ export const useRealTimeHousekeeping = ({
       unsubscribeRooms();
     };
   }, [hotelId]);
+
+  // Efecto para cargar datos iniciales
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   // Efecto para actualizar estadísticas
   useEffect(() => {
