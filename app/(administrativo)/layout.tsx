@@ -20,6 +20,7 @@ import {
   LogOut,
   Bell,
   X,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -96,11 +97,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: "/hotel-admin/dashboard",
       icon: LayoutDashboard,
     },
-    {
-      name: "Habitaciones",
-      href: "/hotel-admin/rooms",
-      icon: BedDouble,
-    },
+    // {
+    //   name: "Habitaciones",
+    //   href: "/hotel-admin/rooms",
+    //   icon: BedDouble,
+    // },
     {
       name: "Housekeeping",
       href: "/hotel-admin/housekeeping",
@@ -110,6 +111,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       name: "Mantenimiento",
       href: "/hotel-admin/maintenance",
       icon: AlertTriangle,
+    },
+    {
+      name: "Activos",
+      href: "/hotel-admin/assets",
+      icon: Package,
     },
     {
       name: "Personal",

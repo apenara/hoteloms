@@ -1,48 +1,54 @@
 // src/app/services/storage.ts
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase/config';
-import { v4 as uuidv4 } from 'uuid';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase/config";
+import { v4 as uuidv4 } from "uuid";
 
 const validateSession = () => {
-  const staffSession = sessionStorage.getItem('currentStaffSession');
+  const staffSession = sessionStorage.getItem("currentStaffSession");
   if (!staffSession) {
-    throw new Error('No hay una sesión activa de personal');
+    throw new Error("No hay una sesión activa de personal");
   }
   return JSON.parse(staffSession);
 };
 
 export async function uploadMaintenanceImages(
   hotelId: string,
-  roomId: string,
-  maintenanceId: string,
+  assetId: string | null, // Now assetId can be null, but is required
+  maintenanceId: string | null, // Make this optional, it is null for assets
   files: File[]
 ): Promise<string[]> {
   try {
     // Validar datos
-    if (!hotelId || !roomId || !maintenanceId) {
-      console.error('Datos incompletos para subir imágenes', { hotelId, roomId, maintenanceId });
-      throw new Error('Datos incompletos para subir imágenes');
+    if (!hotelId || (!assetId && !maintenanceId)) {
+      console.error("Datos incompletos para subir imágenes", {
+        hotelId,
+        assetId,
+        maintenanceId,
+      });
+      throw new Error("Datos incompletos para subir imágenes");
     }
-    
+
     if (!files.length) {
-      console.log('No hay archivos para subir');
+      console.log("No hay archivos para subir");
       return [];
     }
-    
+
     console.log(`Preparando para subir ${files.length} imágenes`);
-    
+
     // Validar sesión activa (opcional, dependiendo de tu implementación)
-    const staffSession = sessionStorage.getItem('currentStaffSession');
+    const staffSession = sessionStorage.getItem("currentStaffSession");
     if (!staffSession) {
-      console.warn('No hay una sesión activa de personal');
+      console.warn("No hay una sesión activa de personal");
       // Dependiendo de tu lógica, podrías lanzar un error o continuar
     }
-    
+
     const uploadPromises = files.map(async (file, index) => {
-      console.log(`Procesando imagen ${index + 1}/${files.length}: ${file.name}`);
-      
+      console.log(
+        `Procesando imagen ${index + 1}/${files.length}: ${file.name}`
+      );
+
       // Validar tipo de archivo
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         console.warn(`El archivo ${file.name} no es una imagen`);
         throw new Error(`El archivo ${file.name} debe ser una imagen`);
       }
@@ -55,36 +61,44 @@ export async function uploadMaintenanceImages(
       }
 
       // Generar nombre único
-      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const fileName = `${uuidv4()}.${extension}`;
       console.log(`Nombre generado para imagen ${index + 1}: ${fileName}`);
 
       // Crear referencia con estructura de carpetas
-      const storageRef = ref(
-        storage,
-        `hotels/${hotelId}/maintenance/${maintenanceId}/${fileName}`
-      );
+      let storageRef;
+      if (maintenanceId) {
+        storageRef = ref(
+          storage,
+          `hotels/${hotelId}/maintenance/${maintenanceId}/${fileName}`
+        );
+      } else {
+        storageRef = ref(
+          storage,
+          `hotels/${hotelId}/assets/${assetId}/${fileName}`
+        );
+      }
 
       // Subir archivo
       console.log(`Iniciando subida de imagen ${index + 1}`);
       const snapshot = await uploadBytes(storageRef, file);
       console.log(`Imagen ${index + 1} subida correctamente`);
-      
+
       // Obtener URL
       const downloadUrl = await getDownloadURL(snapshot.ref);
       console.log(`URL obtenida para imagen ${index + 1}: ${downloadUrl}`);
-      
+
       return downloadUrl;
     });
 
-    console.log('Esperando que todas las subidas terminen...');
+    console.log("Esperando que todas las subidas terminen...");
     // Esperar que todas las subidas terminen
     const urls = await Promise.all(uploadPromises);
     console.log(`${urls.length} imágenes subidas exitosamente`);
-    
+
     return urls;
   } catch (error) {
-    console.error('Error al subir imágenes:', error);
+    console.error("Error al subir imágenes:", error);
     throw error;
   }
 }

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/auth';
-import { db } from '@/lib/firebase/config';
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
+import { db } from "@/lib/firebase/config";
 import {
   collection,
   addDoc,
@@ -14,22 +14,22 @@ import {
   orderBy,
   serverTimestamp,
   where,
-  getDocs
-} from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+  getDocs,
+} from "firebase/firestore";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { toast } from '@/app/hooks/use-toast';
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "@/app/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -37,17 +37,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Pencil, 
-  Trash2, 
-  Plus, 
-  Tag, 
-  Search, 
-  Info, 
-  AlertCircle 
-} from 'lucide-react';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  Tag,
+  Search,
+  Info,
+  AlertCircle,
+} from "lucide-react";
 
 // Interfaz para la categoría de activos
 interface AssetCategory {
@@ -65,25 +65,27 @@ export default function AssetCategoriesManager() {
   const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  
+  const [searchTerm, setSearchTerm] = useState("");
+
   // Estado para el formulario
   const [isOpen, setIsOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentCategory, setCurrentCategory] = useState<Partial<AssetCategory> | null>(null);
+  const [currentCategory, setCurrentCategory] =
+    useState<Partial<AssetCategory> | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<AssetCategory | null>(null);
+  const [categoryToDelete, setCategoryToDelete] =
+    useState<AssetCategory | null>(null);
 
   // Colores predefinidos para las categorías
   const predefinedColors = [
-    'bg-blue-100 text-blue-800',
-    'bg-green-100 text-green-800',
-    'bg-red-100 text-red-800',
-    'bg-yellow-100 text-yellow-800',
-    'bg-purple-100 text-purple-800',
-    'bg-pink-100 text-pink-800',
-    'bg-indigo-100 text-indigo-800',
-    'bg-gray-100 text-gray-800',
+    "bg-blue-100 text-blue-800",
+    "bg-green-100 text-green-800",
+    "bg-red-100 text-red-800",
+    "bg-yellow-100 text-yellow-800",
+    "bg-purple-100 text-purple-800",
+    "bg-pink-100 text-pink-800",
+    "bg-indigo-100 text-indigo-800",
+    "bg-gray-100 text-gray-800",
   ];
 
   // Suscribirse a los cambios en la colección de categorías
@@ -91,10 +93,15 @@ export default function AssetCategoriesManager() {
     if (!user?.hotelId) return;
 
     setLoading(true);
-    
-    const categoriesRef = collection(db, 'hotels', user.hotelId, 'asset_categories');
-    const q = query(categoriesRef, orderBy('name', 'asc'));
-    
+
+    const categoriesRef = collection(
+      db,
+      "hotels",
+      user.hotelId,
+      "asset_categories"
+    );
+    const q = query(categoriesRef, orderBy("name", "asc"));
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -102,34 +109,39 @@ export default function AssetCategoriesManager() {
           id: doc.id,
           ...doc.data(),
         })) as AssetCategory[];
-        
+
         // Obtener el conteo de activos por categoría
         Promise.all(
           categoriesData.map(async (category) => {
-            const assetsRef = collection(db, 'hotels', user.hotelId, 'assets');
-            const assetsQuery = query(assetsRef, where('categoryId', '==', category.id));
+            const assetsRef = collection(db, "hotels", user.hotelId, "assets");
+            const assetsQuery = query(
+              assetsRef,
+              where("categoryId", "==", category.id)
+            );
             const assetsSnapshot = await getDocs(assetsQuery);
             return {
               ...category,
               assetsCount: assetsSnapshot.size,
             };
           })
-        ).then((categoriesWithCount) => {
-          setCategories(categoriesWithCount);
-          setLoading(false);
-        }).catch((error) => {
-          console.error('Error al obtener conteo de activos:', error);
-          setError('Error al cargar las categorías');
-          setLoading(false);
-        });
+        )
+          .then((categoriesWithCount) => {
+            setCategories(categoriesWithCount);
+            setLoading(false);
+          })
+          .catch((error) => {
+            console.error("Error al obtener conteo de activos:", error);
+            setError("Error al cargar las categorías");
+            setLoading(false);
+          });
       },
       (error) => {
-        console.error('Error al cargar categorías:', error);
-        setError('Error al cargar las categorías');
+        console.error("Error al cargar categorías:", error);
+        setError("Error al cargar las categorías");
         setLoading(false);
       }
     );
-    
+
     return () => unsubscribe();
   }, [user?.hotelId]);
 
@@ -143,8 +155,8 @@ export default function AssetCategoriesManager() {
   // Abrir formulario para agregar una nueva categoría
   const handleAddCategory = () => {
     setCurrentCategory({
-      name: '',
-      description: '',
+      name: "",
+      description: "",
       color: predefinedColors[0],
     });
     setIsOpen(true);
@@ -165,49 +177,60 @@ export default function AssetCategoriesManager() {
   // Guardar categoría (crear o actualizar)
   const handleSaveCategory = async () => {
     if (!user?.hotelId || !currentCategory?.name) return;
-    
+
     try {
       setIsProcessing(true);
-      
+
       if (currentCategory.id) {
         // Actualizar categoría existente
-        const categoryRef = doc(db, 'hotels', user.hotelId, 'asset_categories', currentCategory.id);
+        const categoryRef = doc(
+          db,
+          "hotels",
+          user.hotelId,
+          "asset_categories",
+          currentCategory.id
+        );
         await updateDoc(categoryRef, {
           name: currentCategory.name,
-          description: currentCategory.description || '',
+          description: currentCategory.description || "",
           color: currentCategory.color,
           updatedAt: serverTimestamp(),
         });
-        
+
         toast({
           title: "Categoría actualizada",
-          description: "La categoría se ha actualizado correctamente."
+          description: "La categoría se ha actualizado correctamente.",
         });
       } else {
         // Crear nueva categoría
-        const categoryRef = collection(db, 'hotels', user.hotelId, 'asset_categories');
+        const categoryRef = collection(
+          db,
+          "hotels",
+          user.hotelId,
+          "asset_categories"
+        );
         await addDoc(categoryRef, {
           name: currentCategory.name,
-          description: currentCategory.description || '',
+          description: currentCategory.description || "",
           color: currentCategory.color,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        
+
         toast({
           title: "Categoría creada",
-          description: "La categoría se ha creado correctamente."
+          description: "La categoría se ha creado correctamente.",
         });
       }
-      
+
       setIsOpen(false);
       setCurrentCategory(null);
     } catch (error) {
-      console.error('Error al guardar categoría:', error);
+      console.error("Error al guardar categoría:", error);
       toast({
         title: "Error",
         description: "Ocurrió un error al guardar la categoría.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
@@ -217,39 +240,45 @@ export default function AssetCategoriesManager() {
   // Eliminar categoría
   const handleDeleteCategory = async () => {
     if (!user?.hotelId || !categoryToDelete) return;
-    
+
     try {
       setIsProcessing(true);
-      
+
       // Verificar si hay activos asociados a esta categoría
       if ((categoryToDelete.assetsCount || 0) > 0) {
         toast({
           title: "No se puede eliminar",
           description: `Esta categoría está siendo utilizada por ${categoryToDelete.assetsCount} activos. Reasigna estos activos antes de eliminar la categoría.`,
-          variant: "destructive"
+          variant: "destructive",
         });
         setIsDeleteDialogOpen(false);
         setIsProcessing(false);
         return;
       }
-      
+
       // Eliminar la categoría
-      const categoryRef = doc(db, 'hotels', user.hotelId, 'asset_categories', categoryToDelete.id);
+      const categoryRef = doc(
+        db,
+        "hotels",
+        user.hotelId,
+        "asset_categories",
+        categoryToDelete.id
+      );
       await deleteDoc(categoryRef);
-      
+
       toast({
         title: "Categoría eliminada",
-        description: "La categoría se ha eliminado correctamente."
+        description: "La categoría se ha eliminado correctamente.",
       });
-      
+
       setIsDeleteDialogOpen(false);
       setCategoryToDelete(null);
     } catch (error) {
-      console.error('Error al eliminar categoría:', error);
+      console.error("Error al eliminar categoría:", error);
       toast({
         title: "Error",
         description: "Ocurrió un error al eliminar la categoría.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
@@ -258,7 +287,11 @@ export default function AssetCategoriesManager() {
 
   // Renderizar estado de carga
   if (loading) {
-    return <div className="flex items-center justify-center p-6">Cargando categorías...</div>;
+    return (
+      <div className="flex items-center justify-center p-6">
+        Cargando categorías...
+      </div>
+    );
   }
 
   return (
@@ -270,7 +303,7 @@ export default function AssetCategoriesManager() {
             Categorías de Activos
           </CardTitle>
           <Button onClick={handleAddCategory}>
-            <Plus className="h-4 w-4 mr-2" /> 
+            <Plus className="h-4 w-4 mr-2" />
             Nueva Categoría
           </Button>
         </CardHeader>
@@ -280,7 +313,7 @@ export default function AssetCategoriesManager() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           {/* Buscador */}
           <div className="flex mb-4 relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
@@ -291,7 +324,7 @@ export default function AssetCategoriesManager() {
               className="pl-8"
             />
           </div>
-          
+
           {/* Tabla de categorías */}
           <div className="border rounded-md">
             <Table>
@@ -307,17 +340,26 @@ export default function AssetCategoriesManager() {
               <TableBody>
                 {filteredCategories.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-4 text-gray-500">
-                      {searchTerm ? 'No se encontraron categorías que coincidan con la búsqueda' : 'No hay categorías definidas'}
+                    <TableCell
+                      colSpan={5}
+                      className="text-center py-4 text-gray-500"
+                    >
+                      {searchTerm
+                        ? "No se encontraron categorías que coincidan con la búsqueda"
+                        : "No hay categorías definidas"}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredCategories.map((category) => (
                     <TableRow key={category.id}>
-                      <TableCell className="font-medium">{category.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {category.name}
+                      </TableCell>
                       <TableCell>{category.description}</TableCell>
                       <TableCell>
-                        <Badge className={category.color || predefinedColors[0]}>
+                        <Badge
+                          className={category.color || predefinedColors[0]}
+                        >
                           Muestra
                         </Badge>
                       </TableCell>
@@ -352,7 +394,7 @@ export default function AssetCategoriesManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {currentCategory?.id ? 'Editar Categoría' : 'Nueva Categoría'}
+              {currentCategory?.id ? "Editar Categoría" : "Nueva Categoría"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -360,9 +402,12 @@ export default function AssetCategoriesManager() {
               <Label htmlFor="name">Nombre</Label>
               <Input
                 id="name"
-                value={currentCategory?.name || ''}
+                value={currentCategory?.name || ""}
                 onChange={(e) =>
-                  setCurrentCategory((prev) => ({ ...prev, name: e.target.value }))
+                  setCurrentCategory((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
                 }
                 placeholder="Ej: Mobiliario, Electrónica, Lencería"
               />
@@ -371,9 +416,12 @@ export default function AssetCategoriesManager() {
               <Label htmlFor="description">Descripción</Label>
               <Textarea
                 id="description"
-                value={currentCategory?.description || ''}
+                value={currentCategory?.description || ""}
                 onChange={(e) =>
-                  setCurrentCategory((prev) => ({ ...prev, description: e.target.value }))
+                  setCurrentCategory((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
                 placeholder="Descripción breve de la categoría"
                 rows={3}
@@ -387,14 +435,16 @@ export default function AssetCategoriesManager() {
                     key={color}
                     className={`h-10 rounded-md cursor-pointer border-2 ${
                       currentCategory?.color === color
-                        ? 'border-primary'
-                        : 'border-transparent'
+                        ? "border-primary"
+                        : "border-transparent"
                     } flex items-center justify-center ${color}`}
                     onClick={() =>
                       setCurrentCategory((prev) => ({ ...prev, color }))
                     }
                   >
-                    {currentCategory?.color === color && <Tag className="h-4 w-4" />}
+                    {currentCategory?.color === color && (
+                      <Tag className="h-4 w-4" />
+                    )}
                   </div>
                 ))}
               </div>
@@ -408,15 +458,15 @@ export default function AssetCategoriesManager() {
             >
               Cancelar
             </Button>
-            <Button 
-              onClick={handleSaveCategory} 
+            <Button
+              onClick={handleSaveCategory}
               disabled={!currentCategory?.name || isProcessing}
             >
               {isProcessing
-                ? 'Guardando...'
+                ? "Guardando..."
                 : currentCategory?.id
-                ? 'Actualizar'
-                : 'Crear'}
+                ? "Actualizar"
+                : "Crear"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -433,15 +483,16 @@ export default function AssetCategoriesManager() {
           </DialogHeader>
           <div className="py-4">
             <p>
-              ¿Estás seguro de que deseas eliminar la categoría{' '}
+              ¿Estás seguro de que deseas eliminar la categoría{" "}
               <strong>{categoryToDelete?.name}</strong>?
             </p>
             {(categoryToDelete?.assetsCount || 0) > 0 && (
               <Alert variant="destructive" className="mt-4">
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  Esta categoría está siendo utilizada por {categoryToDelete?.assetsCount} activos.
-                  Debes reasignar estos activos antes de eliminar la categoría.
+                  Esta categoría está siendo utilizada por{" "}
+                  {categoryToDelete?.assetsCount} activos. Debes reasignar estos
+                  activos antes de eliminar la categoría.
                 </AlertDescription>
               </Alert>
             )}
@@ -457,9 +508,11 @@ export default function AssetCategoriesManager() {
             <Button
               variant="destructive"
               onClick={handleDeleteCategory}
-              disabled={(categoryToDelete?.assetsCount || 0) > 0 || isProcessing}
+              disabled={
+                (categoryToDelete?.assetsCount || 0) > 0 || isProcessing
+              }
             >
-              {isProcessing ? 'Eliminando...' : 'Eliminar'}
+              {isProcessing ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>

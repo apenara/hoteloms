@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/auth';
-import { db } from '@/lib/firebase/config';
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
+import { db } from "@/lib/firebase/config";
 import {
   collection,
   query,
@@ -14,27 +14,27 @@ import {
   getDoc,
   addDoc,
   serverTimestamp,
-} from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "firebase/firestore";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { toast } from '@/app/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+} from "@/components/ui/dialog";
+import { toast } from "@/app/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -42,7 +42,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Search,
   Plus,
@@ -54,10 +54,12 @@ import {
   Wrench,
   Loader2,
   Home,
-} from 'lucide-react';
-import AssetForm from '@/components/assets/AssetForm';
-import { Asset, AssetCategory, Room } from '@/app/lib/types';
-import AssetTransferDialog from '@/components/assets/AssetTransferDialog'; // Este componente aún no lo hemos creado
+} from "lucide-react";
+import AssetForm from "@/components/assets/AssetForm";
+import { Asset, AssetCategory, Room } from "@/app/lib/types";
+import AssetTransferDialog from "@/components/assets/AssetTransferDialog";
+import AssetDetailsView from "@/components/assets/AssetDetailsView";
+import AssetMaintenanceForm from "@/components/assets/AssetMaintenanceForm";
 
 // Componente para la página de lista de activos
 export default function AssetsList() {
@@ -71,16 +73,17 @@ export default function AssetsList() {
   const [error, setError] = useState<string | null>(null);
 
   // Estados para búsqueda y filtros
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [roomFilter, setRoomFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [roomFilter, setRoomFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Estados para diálogos
   const [showAssetForm, setShowAssetForm] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
+  const [showDetailsView, setShowDetailsView] = useState(false);
 
   // Cargar datos iniciales: activos, categorías y habitaciones
   useEffect(() => {
@@ -92,19 +95,27 @@ export default function AssetsList() {
 
       try {
         // 1. Suscripción a las categorías
-        const categoriesRef = collection(db, 'hotels', user.hotelId, 'asset_categories');
-        const categoriesQuery = query(categoriesRef, orderBy('name', 'asc'));
-        const unsubscribeCategories = onSnapshot(categoriesQuery, (snapshot) => {
-          const categoriesData = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as AssetCategory[];
-          setCategories(categoriesData);
-        });
+        const categoriesRef = collection(
+          db,
+          "hotels",
+          user.hotelId,
+          "asset_categories"
+        );
+        const categoriesQuery = query(categoriesRef, orderBy("name", "asc"));
+        const unsubscribeCategories = onSnapshot(
+          categoriesQuery,
+          (snapshot) => {
+            const categoriesData = snapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as AssetCategory[];
+            setCategories(categoriesData);
+          }
+        );
 
         // 2. Suscripción a las habitaciones
-        const roomsRef = collection(db, 'hotels', user.hotelId, 'rooms');
-        const roomsQuery = query(roomsRef, orderBy('number', 'asc'));
+        const roomsRef = collection(db, "hotels", user.hotelId, "rooms");
+        const roomsQuery = query(roomsRef, orderBy("number", "asc"));
         const unsubscribeRooms = onSnapshot(roomsQuery, (snapshot) => {
           const roomsData = snapshot.docs.map((doc) => ({
             id: doc.id,
@@ -114,15 +125,21 @@ export default function AssetsList() {
         });
 
         // 3. Suscripción a los activos
-        const assetsRef = collection(db, 'hotels', user.hotelId, 'assets');
-        const assetsQuery = query(assetsRef, orderBy('assetCode', 'asc'));
+        const assetsRef = collection(db, "hotels", user.hotelId, "assets");
+        const assetsQuery = query(assetsRef, orderBy("assetCode", "asc"));
         const unsubscribeAssets = onSnapshot(assetsQuery, (snapshot) => {
           const assetsData = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
           })) as Asset[];
           setAssets(assetsData);
-          applyFilters(assetsData, searchTerm, categoryFilter, roomFilter, statusFilter);
+          applyFilters(
+            assetsData,
+            searchTerm,
+            categoryFilter,
+            roomFilter,
+            statusFilter
+          );
           setLoading(false);
         });
 
@@ -133,8 +150,8 @@ export default function AssetsList() {
           unsubscribeAssets();
         };
       } catch (error) {
-        console.error('Error al cargar datos:', error);
-        setError('Error al cargar los datos. Por favor, intenta de nuevo.');
+        console.error("Error al cargar datos:", error);
+        setError("Error al cargar los datos. Por favor, intenta de nuevo.");
         setLoading(false);
       }
     };
@@ -165,17 +182,17 @@ export default function AssetsList() {
     }
 
     // Filtrar por categoría
-    if (category !== 'all') {
+    if (category !== "all") {
       filtered = filtered.filter((asset) => asset.categoryId === category);
     }
 
     // Filtrar por habitación
-    if (room !== 'all') {
+    if (room !== "all") {
       filtered = filtered.filter((asset) => asset.roomId === room);
     }
 
     // Filtrar por estado
-    if (status !== 'all') {
+    if (status !== "all") {
       filtered = filtered.filter((asset) => asset.status === status);
     }
 
@@ -203,21 +220,41 @@ export default function AssetsList() {
     setShowMaintenanceDialog(true);
   };
 
-  const handleCreateMaintenanceRequest = async (details: { description: string; priority: string }) => {
+  const handleViewDetails = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setShowDetailsView(true);
+  };
+
+  const handleCreateMaintenanceRequest = async (details: {
+    description: string;
+    priority: string;
+  }) => {
     if (!user?.hotelId || !selectedAsset) return;
 
     try {
       // 1. Actualizar el estado del activo
-      const assetRef = doc(db, 'hotels', user.hotelId, 'assets', selectedAsset.id!);
+      const assetRef = doc(
+        db,
+        "hotels",
+        user.hotelId,
+        "assets",
+        selectedAsset.id!
+      );
       await updateDoc(assetRef, {
-        status: 'maintenance',
+        status: "maintenance",
         updatedAt: serverTimestamp(),
       });
 
       // 2. Obtener datos de la habitación para la solicitud
-      let roomNumber = 'No asignada';
+      let roomNumber = "No asignada";
       if (selectedAsset.roomId) {
-        const roomRef = doc(db, 'hotels', user.hotelId, 'rooms', selectedAsset.roomId);
+        const roomRef = doc(
+          db,
+          "hotels",
+          user.hotelId,
+          "rooms",
+          selectedAsset.roomId
+        );
         const roomDoc = await getDoc(roomRef);
         if (roomDoc.exists()) {
           roomNumber = roomDoc.data().number;
@@ -225,9 +262,14 @@ export default function AssetsList() {
       }
 
       // 3. Crear la solicitud de mantenimiento
-      const maintenanceRef = collection(db, 'hotels', user.hotelId, 'maintenance');
+      const maintenanceRef = collection(
+        db,
+        "hotels",
+        user.hotelId,
+        "maintenance"
+      );
       await addDoc(maintenanceRef, {
-        type: 'asset_maintenance',
+        type: "asset_maintenance",
         assetId: selectedAsset.id,
         assetCode: selectedAsset.assetCode,
         assetName: selectedAsset.name,
@@ -235,7 +277,7 @@ export default function AssetsList() {
         roomNumber,
         description: details.description,
         priority: details.priority,
-        status: 'pending',
+        status: "pending",
         createdAt: serverTimestamp(),
         createdBy: {
           id: user.uid,
@@ -244,29 +286,36 @@ export default function AssetsList() {
       });
 
       // 4. Registrar en el historial del activo
-      const historyRef = collection(db, 'hotels', user.hotelId, 'assets', selectedAsset.id!, 'history');
+      const historyRef = collection(
+        db,
+        "hotels",
+        user.hotelId,
+        "assets",
+        selectedAsset.id!,
+        "history"
+      );
       await addDoc(historyRef, {
-        type: 'maintenance_request',
+        type: "maintenance_request",
         date: serverTimestamp(),
         description: details.description,
         previousStatus: selectedAsset.status,
-        newStatus: 'maintenance',
+        newStatus: "maintenance",
         userId: user.uid,
-        userName: user.name || 'Usuario',
+        userName: user.name || "Usuario",
       });
 
       toast({
-        title: 'Solicitud creada',
-        description: 'Se ha enviado el activo a mantenimiento',
+        title: "Solicitud creada",
+        description: "Se ha enviado el activo a mantenimiento",
       });
 
       setShowMaintenanceDialog(false);
     } catch (error) {
-      console.error('Error al crear solicitud:', error);
+      console.error("Error al crear solicitud:", error);
       toast({
-        title: 'Error',
-        description: 'No se pudo crear la solicitud de mantenimiento',
-        variant: 'destructive',
+        title: "Error",
+        description: "No se pudo crear la solicitud de mantenimiento",
+        variant: "destructive",
       });
     }
   };
@@ -274,42 +323,54 @@ export default function AssetsList() {
   // Función para obtener los nombres de categoría y habitación
   const getCategoryName = (categoryId: string) => {
     const category = categories.find((c) => c.id === categoryId);
-    return category ? category.name : 'No asignada';
+    return category ? category.name : "No asignada";
   };
 
   const getRoomNumber = (roomId: string) => {
     const room = rooms.find((r) => r.id === roomId);
-    return room ? room.number : 'No asignada';
+    return room ? room.number : "No asignada";
   };
 
   // Funciones para renderizar badges de estado
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      active: { class: 'bg-green-100 text-green-800', label: 'Activo' },
-      maintenance: { class: 'bg-yellow-100 text-yellow-800', label: 'En Mantenimiento' },
-      retired: { class: 'bg-red-100 text-red-800', label: 'Dado de Baja' },
-      pending: { class: 'bg-blue-100 text-blue-800', label: 'Pendiente de Asignación' },
+      active: { class: "bg-green-100 text-green-800", label: "Activo" },
+      maintenance: {
+        class: "bg-yellow-100 text-yellow-800",
+        label: "En Mantenimiento",
+      },
+      retired: { class: "bg-red-100 text-red-800", label: "Dado de Baja" },
+      pending: {
+        class: "bg-blue-100 text-blue-800",
+        label: "Pendiente de Asignación",
+      },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.active;
+    const config =
+      statusConfig[status as keyof typeof statusConfig] || statusConfig.active;
     return <Badge className={config.class}>{config.label}</Badge>;
   };
 
   const getConditionBadge = (condition: string) => {
     const conditionConfig = {
-      new: { class: 'bg-emerald-100 text-emerald-800', label: 'Nuevo' },
-      good: { class: 'bg-blue-100 text-blue-800', label: 'Buen Estado' },
-      fair: { class: 'bg-amber-100 text-amber-800', label: 'Estado Regular' },
-      poor: { class: 'bg-red-100 text-red-800', label: 'Mal Estado' },
+      new: { class: "bg-emerald-100 text-emerald-800", label: "Nuevo" },
+      good: { class: "bg-blue-100 text-blue-800", label: "Buen Estado" },
+      fair: { class: "bg-amber-100 text-amber-800", label: "Estado Regular" },
+      poor: { class: "bg-red-100 text-red-800", label: "Mal Estado" },
     };
 
-    const config = conditionConfig[condition as keyof typeof conditionConfig] || conditionConfig.good;
+    const config =
+      conditionConfig[condition as keyof typeof conditionConfig] ||
+      conditionConfig.good;
     return <Badge className={config.class}>{config.label}</Badge>;
   };
 
   // Renderizar diálogo de mantenimiento
   const renderMaintenanceDialog = () => (
-    <Dialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog}>
+    <Dialog
+      open={showMaintenanceDialog}
+      onOpenChange={setShowMaintenanceDialog}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Enviar a Mantenimiento</DialogTitle>
@@ -319,14 +380,18 @@ export default function AssetsList() {
             {selectedAsset && (
               <div className="p-4 bg-gray-50 rounded-md">
                 <h3 className="font-medium">{selectedAsset.name}</h3>
-                <p className="text-sm text-gray-500">Código: {selectedAsset.assetCode}</p>
+                <p className="text-sm text-gray-500">
+                  Código: {selectedAsset.assetCode}
+                </p>
                 <p className="text-sm text-gray-500">
                   Ubicación: Habitación {getRoomNumber(selectedAsset.roomId)}
                 </p>
               </div>
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción del Problema</label>
+              <label className="text-sm font-medium">
+                Descripción del Problema
+              </label>
               <textarea
                 id="maintenanceDescription"
                 className="w-full rounded-md border border-input bg-transparent px-3 py-2 min-h-[100px]"
@@ -349,14 +414,24 @@ export default function AssetsList() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setShowMaintenanceDialog(false)}>
+          <Button
+            variant="outline"
+            onClick={() => setShowMaintenanceDialog(false)}
+          >
             Cancelar
           </Button>
           <Button
             onClick={() =>
               handleCreateMaintenanceRequest({
-                description: (document.getElementById('maintenanceDescription') as HTMLTextAreaElement).value,
-                priority: document.querySelector('[data-value]')?.getAttribute('data-value') || 'medium',
+                description: (
+                  document.getElementById(
+                    "maintenanceDescription"
+                  ) as HTMLTextAreaElement
+                ).value,
+                priority:
+                  document
+                    .querySelector("[data-value]")
+                    ?.getAttribute("data-value") || "medium",
               })
             }
           >
@@ -373,10 +448,12 @@ export default function AssetsList() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl">Inventario de Activos</CardTitle>
-          <Button onClick={() => {
-            setSelectedAsset(null);
-            setShowAssetForm(true);
-          }}>
+          <Button
+            onClick={() => {
+              setSelectedAsset(null);
+              setShowAssetForm(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Activo
           </Button>
@@ -396,10 +473,7 @@ export default function AssetsList() {
             </div>
 
             {/* Filtro por categoría */}
-            <Select
-              value={categoryFilter}
-              onValueChange={setCategoryFilter}
-            >
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger>
                 <div className="flex items-center">
                   <Tag className="h-4 w-4 mr-2" />
@@ -417,10 +491,7 @@ export default function AssetsList() {
             </Select>
 
             {/* Filtro por habitación */}
-            <Select
-              value={roomFilter}
-              onValueChange={setRoomFilter}
-            >
+            <Select value={roomFilter} onValueChange={setRoomFilter}>
               <SelectTrigger>
                 <div className="flex items-center">
                   <Home className="h-4 w-4 mr-2" />
@@ -438,10 +509,7 @@ export default function AssetsList() {
             </Select>
 
             {/* Filtro por estado */}
-            <Select
-              value={statusFilter}
-              onValueChange={setStatusFilter}
-            >
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <div className="flex items-center">
                   <Filter className="h-4 w-4 mr-2" />
@@ -453,7 +521,9 @@ export default function AssetsList() {
                 <SelectItem value="active">Activos</SelectItem>
                 <SelectItem value="maintenance">En Mantenimiento</SelectItem>
                 <SelectItem value="retired">Dados de Baja</SelectItem>
-                <SelectItem value="pending">Pendientes de Asignación</SelectItem>
+                <SelectItem value="pending">
+                  Pendientes de Asignación
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -480,23 +550,38 @@ export default function AssetsList() {
                 <TableBody>
                   {filteredAssets.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                        No se encontraron activos con los criterios seleccionados
+                      <TableCell
+                        colSpan={7}
+                        className="text-center py-8 text-gray-500"
+                      >
+                        No se encontraron activos con los criterios
+                        seleccionados
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredAssets.map((asset) => (
                       <TableRow key={asset.id}>
-                        <TableCell className="font-medium">{asset.assetCode}</TableCell>
+                        <TableCell className="font-medium">
+                          {asset.assetCode}
+                        </TableCell>
                         <TableCell>
-                          <div className="max-w-[200px] truncate" title={asset.name}>
+                          <div
+                            className="max-w-[200px] truncate"
+                            title={asset.name}
+                          >
                             {asset.name}
                           </div>
                         </TableCell>
-                        <TableCell>{getCategoryName(asset.categoryId)}</TableCell>
-                        <TableCell>Habitación {getRoomNumber(asset.roomId)}</TableCell>
+                        <TableCell>
+                          {getCategoryName(asset.categoryId)}
+                        </TableCell>
+                        <TableCell>
+                          Habitación {getRoomNumber(asset.roomId)}
+                        </TableCell>
                         <TableCell>{getStatusBadge(asset.status)}</TableCell>
-                        <TableCell>{getConditionBadge(asset.condition)}</TableCell>
+                        <TableCell>
+                          {getConditionBadge(asset.condition)}
+                        </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button
                             variant="ghost"
@@ -511,7 +596,7 @@ export default function AssetsList() {
                             size="icon"
                             onClick={() => handleTransferAsset(asset)}
                             title="Trasladar"
-                            disabled={asset.status === 'maintenance'}
+                            disabled={asset.status === "maintenance"}
                           >
                             <MoveRight className="h-4 w-4" />
                           </Button>
@@ -520,14 +605,17 @@ export default function AssetsList() {
                             size="icon"
                             onClick={() => handleSendToMaintenance(asset)}
                             title="Enviar a mantenimiento"
-                            disabled={asset.status === 'maintenance' || asset.status === 'retired'}
+                            disabled={
+                              asset.status === "maintenance" ||
+                              asset.status === "retired"
+                            }
                           >
                             <Wrench className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => {/* Navegación a detalles */}}
+                            onClick={() => handleViewDetails(asset)}
                             title="Ver detalles"
                           >
                             <Eye className="h-4 w-4" />
@@ -562,7 +650,7 @@ export default function AssetsList() {
           onClose={() => setShowTransferDialog(false)}
           asset={selectedAsset}
           currentRoomId={selectedAsset.roomId}
-          hotelId={user?.hotelId || ''}
+          hotelId={user?.hotelId || ""}
           onSuccess={() => {
             setShowTransferDialog(false);
             setSelectedAsset(null);
@@ -571,6 +659,30 @@ export default function AssetsList() {
       )}
 
       {renderMaintenanceDialog()}
+
+      {/* Vista de detalles */}
+      {showDetailsView && selectedAsset && (
+        <AssetDetailsView
+          assetId={selectedAsset.id!}
+          isOpen={showDetailsView}
+          onClose={() => setShowDetailsView(false)}
+          hotelId={user?.hotelId || ""}
+        />
+      )}
+
+      {/* Formulario de mantenimiento */}
+      {showMaintenanceDialog && selectedAsset && (
+        <AssetMaintenanceForm
+          isOpen={showMaintenanceDialog}
+          onClose={() => setShowMaintenanceDialog(false)}
+          asset={selectedAsset}
+          hotelId={user?.hotelId || ""}
+          onSuccess={() => {
+            setShowMaintenanceDialog(false);
+            setSelectedAsset(null);
+          }}
+        />
+      )}
     </div>
   );
 }

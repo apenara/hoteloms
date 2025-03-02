@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/auth';
-import { db } from '@/lib/firebase/config';
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth";
+import { db } from "@/lib/firebase/config";
 import {
   collection,
   doc,
@@ -13,8 +13,8 @@ import {
   updateDoc,
   addDoc,
   serverTimestamp,
-  where
-} from 'firebase/firestore';
+  where,
+} from "firebase/firestore";
 
 import {
   Dialog,
@@ -22,20 +22,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { toast } from '@/app/hooks/use-toast';
-import { Loader2, MoveRight, Home, Info } from 'lucide-react';
+} from "@/components/ui/select";
+import { toast } from "@/app/hooks/use-toast";
+import { Loader2, MoveRight, Home, Info } from "lucide-react";
 
 // Interfaz para la habitación
 interface Room {
@@ -53,8 +53,8 @@ interface Asset {
   description: string;
   categoryId: string;
   roomId: string;
-  status: 'active' | 'maintenance' | 'retired' | 'pending';
-  condition: 'new' | 'good' | 'fair' | 'poor';
+  status: "active" | "maintenance" | "retired" | "pending";
+  condition: "new" | "good" | "fair" | "poor";
 }
 
 interface AssetTransferDialogProps {
@@ -72,7 +72,7 @@ export default function AssetTransferDialog({
   asset,
   currentRoomId,
   hotelId,
-  onSuccess
+  onSuccess,
 }: AssetTransferDialogProps) {
   // Estados
   const { user } = useAuth();
@@ -80,42 +80,45 @@ export default function AssetTransferDialog({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
-  const [transferReason, setTransferReason] = useState<string>('');
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
+  const [transferReason, setTransferReason] = useState<string>("");
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
 
   // Cargar las habitaciones disponibles
   useEffect(() => {
     const fetchRooms = async () => {
       if (!hotelId) return;
-      
+
       try {
         setLoading(true);
-        
+
         // Cargar habitaciones
-        const roomsRef = collection(db, 'hotels', hotelId, 'rooms');
-        const roomsQuery = query(roomsRef, orderBy('number', 'asc'));
+        const roomsRef = collection(db, "hotels", hotelId, "rooms");
+        const roomsQuery = query(roomsRef, orderBy("number", "asc"));
         const roomsSnapshot = await getDocs(roomsQuery);
-        const roomsData = roomsSnapshot.docs.map(doc => ({
+        const roomsData = roomsSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Room[];
-        
+
         // Filtrar la habitación actual para no mostrarla en las opciones
-        const filteredRooms = roomsData.filter(room => room.id !== currentRoomId);
+        const filteredRooms = roomsData.filter(
+          (room) => room.id !== currentRoomId
+        );
         setRooms(filteredRooms);
-        
+
         // Obtener la información de la habitación actual
         if (currentRoomId) {
-          const currentRoomData = roomsData.find(room => room.id === currentRoomId);
+          const currentRoomData = roomsData.find(
+            (room) => room.id === currentRoomId
+          );
           if (currentRoomData) {
             setCurrentRoom(currentRoomData);
           }
         }
-        
       } catch (error) {
-        console.error('Error al cargar habitaciones:', error);
-        setError('Error al cargar las habitaciones disponibles');
+        console.error("Error al cargar habitaciones:", error);
+        setError("Error al cargar las habitaciones disponibles");
       } finally {
         setLoading(false);
       }
@@ -126,8 +129,16 @@ export default function AssetTransferDialog({
 
   // Función para realizar el traslado
   const handleTransfer = async () => {
-    if (!user || !hotelId || !asset.id || !selectedRoomId || !transferReason.trim()) {
-      setError('Por favor, selecciona una habitación y proporciona un motivo para el traslado');
+    if (
+      !user ||
+      !hotelId ||
+      !asset.id ||
+      !selectedRoomId ||
+      !transferReason.trim()
+    ) {
+      setError(
+        "Por favor, selecciona una habitación y proporciona un motivo para el traslado"
+      );
       return;
     }
 
@@ -136,27 +147,34 @@ export default function AssetTransferDialog({
       setError(null);
 
       // 1. Actualizar el activo con la nueva habitación
-      const assetRef = doc(db, 'hotels', hotelId, 'assets', asset.id);
+      const assetRef = doc(db, "hotels", hotelId, "assets", asset.id);
       await updateDoc(assetRef, {
         roomId: selectedRoomId,
         updatedAt: serverTimestamp(),
       });
 
       // 2. Registrar el traslado en el historial del activo
-      const historyRef = collection(db, 'hotels', hotelId, 'assets', asset.id, 'history');
+      const historyRef = collection(
+        db,
+        "hotels",
+        hotelId,
+        "assets",
+        asset.id,
+        "history"
+      );
       await addDoc(historyRef, {
-        type: 'transfer',
+        type: "transfer",
         date: serverTimestamp(),
         previousRoomId: currentRoomId,
         roomId: selectedRoomId,
         reason: transferReason,
         userId: user.uid,
-        userName: user.name || 'Usuario',
+        userName: user.name || "Usuario",
       });
 
       // 3. Notificar éxito
       toast({
-        title: 'Traslado exitoso',
+        title: "Traslado exitoso",
         description: `El activo ha sido trasladado correctamente`,
       });
 
@@ -164,8 +182,10 @@ export default function AssetTransferDialog({
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error al trasladar activo:', error);
-      setError('Ocurrió un error al trasladar el activo. Por favor, intenta de nuevo.');
+      console.error("Error al trasladar activo:", error);
+      setError(
+        "Ocurrió un error al trasladar el activo. Por favor, intenta de nuevo."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -191,12 +211,15 @@ export default function AssetTransferDialog({
           {/* Información del activo */}
           <div className="bg-slate-50 p-3 rounded-md">
             <h3 className="font-medium">{asset.name}</h3>
-            <p className="text-sm text-muted-foreground">Código: {asset.assetCode}</p>
+            <p className="text-sm text-muted-foreground">
+              Código: {asset.assetCode}
+            </p>
             {currentRoom && (
               <div className="flex items-center gap-1 mt-1 text-sm">
                 <Home className="h-3 w-3 text-muted-foreground" />
                 <span className="text-muted-foreground">
-                  Ubicación actual: Habitación {currentRoom.number} (Piso {currentRoom.floor})
+                  Ubicación actual: Habitación {currentRoom.number} (Piso{" "}
+                  {currentRoom.floor})
                 </span>
               </div>
             )}
@@ -205,10 +228,7 @@ export default function AssetTransferDialog({
           {/* Selección de habitación destino */}
           <div className="space-y-2">
             <Label htmlFor="room">Habitación destino</Label>
-            <Select 
-              value={selectedRoomId} 
-              onValueChange={setSelectedRoomId}
-            >
+            <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona una habitación" />
               </SelectTrigger>
@@ -238,17 +258,14 @@ export default function AssetTransferDialog({
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              El traslado quedará registrado en el historial del activo y no podrá deshacerse.
+              El traslado quedará registrado en el historial del activo y no
+              podrá deshacerse.
             </AlertDescription>
           </Alert>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={submitting}
-          >
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
             Cancelar
           </Button>
           <Button
@@ -261,7 +278,7 @@ export default function AssetTransferDialog({
                 Trasladando...
               </>
             ) : (
-              'Confirmar Traslado'
+              "Confirmar Traslado"
             )}
           </Button>
         </DialogFooter>
