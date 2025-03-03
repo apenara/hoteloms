@@ -102,6 +102,7 @@ export function DailyAssignmentCreator({
     "checkout_today",
     "clean_occupied",
     "need_cleaning",
+    "dirty_occupied",
   ]);
   const [showStaffSelector, setShowStaffSelector] = useState<boolean>(false);
   const [selectedStaffMembers, setSelectedStaffMembers] = useState<Set<string>>(
