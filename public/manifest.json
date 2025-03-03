@@ -7,8 +7,10 @@
   "orientation": "any",
   "scope": "/",
   "gcm_sender_id": "103953800507",
-  "start_url": "/auth/login",
+  "start_url": "/verify-session",
   "permissions": ["camera"],
+  "prefer_related_applications": false,
+  "capture_links": "new-client",
   "icons": [
     {
       "src": "windows11/SmallTile.scale-100.png",

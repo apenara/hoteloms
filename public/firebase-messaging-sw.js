@@ -14,6 +14,14 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Evitar interferir con IndexedDB donde Firebase almacena tokens
+self.addEventListener('fetch', (event) => {
+  // No interferir con peticiones a Firebase Auth
+  if (event.request.url.includes('firebaseauth')) {
+    return;
+  }
+});
+
 // Manejo de notificaciones en segundo plano
 messaging.onBackgroundMessage((payload) => {
   console.log("Mensaje recibido en background:", payload);

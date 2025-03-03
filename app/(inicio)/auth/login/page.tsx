@@ -33,6 +33,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const searchParams = useSearchParams();
   const router = useRouter();
   const { loginWithPin } = useAuth();
@@ -49,6 +50,7 @@ export default function LoginPage() {
       // Limpiar el flag de redirección si acabamos de hacer logout
       sessionStorage.removeItem("isRedirecting");
       sessionStorage.removeItem("justLoggedOut");
+      sessionStorage.removeItem("redirectStartTime");
       setIsRedirecting(false);
     } else {
       // Verificar si hay una redirección en progreso
@@ -58,18 +60,41 @@ export default function LoginPage() {
         const redirectStartTime = parseInt(sessionStorage.getItem("redirectStartTime") || "0");
         const currentTime = new Date().getTime();
         
-        // Si han pasado más de 10 segundos, consideramos que la redirección falló
-        if (currentTime - redirectStartTime > 10000) {
+        // Si han pasado más de 15 segundos, consideramos que la redirección falló
+        if (currentTime - redirectStartTime > 15000) {
           // Limpiar el estado de redirección
           sessionStorage.removeItem("isRedirecting");
           sessionStorage.removeItem("redirectStartTime");
           setIsRedirecting(false);
         } else {
           setIsRedirecting(true);
+          
+          // Calcular progreso basado en tiempo transcurrido (máximo 15 segundos)
+          const elapsed = currentTime - redirectStartTime;
+          const progressPercentage = Math.min(Math.floor((elapsed / 15000) * 100), 99);
+          setLoadingProgress(progressPercentage);
         }
       }
     }
   }, []);
+
+  // Efecto para simular progreso de carga si estamos en estado de redirección
+  useEffect(() => {
+    let progressInterval;
+    
+    if (isRedirecting && loadingProgress < 90) {
+      progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          const increment = 90 - prev > 30 ? 5 : 1; // Más rápido al inicio, más lento al final
+          return Math.min(prev + increment, 90);
+        });
+      }, 500);
+    }
+    
+    return () => {
+      if (progressInterval) clearInterval(progressInterval);
+    };
+  }, [isRedirecting, loadingProgress]);
 
   const handlePinSearch = async (pin: string) => {
     try {
@@ -102,6 +127,9 @@ export default function LoginPage() {
 
   const handleRedirection = (redirectUrl) => {
     setIsRedirecting(true);
+    // Iniciar progreso desde cero
+    setLoadingProgress(0);
+    
     // Guardar el estado de redirección en sessionStorage
     sessionStorage.setItem("isRedirecting", "true");
     // Guardar el tiempo de inicio de la redirección
@@ -109,8 +137,10 @@ export default function LoginPage() {
     
     // Esperar un momento para asegurar que la sesión se guardó
     setTimeout(() => {
+      // Establecer progreso a 95% justo antes de redireccionar
+      setLoadingProgress(95);
       window.location.href = redirectUrl;
-    }, 300);
+    }, 800);
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -253,13 +283,56 @@ export default function LoginPage() {
   // Determinar la pestaña por defecto
   const defaultTab = hotelId ? "pin" : "email";
 
-  // Si está redirigiendo, mostrar pantalla de carga
+  // Si está redirigiendo, mostrar pantalla de carga mejorada
   if (isRedirecting) {
     return (
-      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
-        <h2 className="text-xl font-semibold text-gray-700">Iniciando sesión...</h2>
-        <p className="text-gray-500 mt-2">Por favor espere un momento</p>
+      <div className="fixed inset-0 bg-gradient-to-r from-blue-100 to-indigo-50 flex flex-col items-center justify-center z-50">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full mx-4 flex flex-col items-center">
+          {/* Logo del hotel (puedes reemplazar con tu propio logo) */}
+          <div className="w-16 h-16 mb-6 flex items-center justify-center">
+            <svg
+              className="w-full h-full text-blue-500"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" />
+              <path d="M1 21h22" />
+              <path d="M7 10.5V7" />
+              <path d="M17 10.5V7" />
+              <path d="M12 10.5V7" />
+              <path d="M7 14.5v-4" />
+              <path d="M17 14.5v-4" />
+              <path d="M12 14.5v-4" />
+            </svg>
+          </div>
+
+          {/* Animación de carga */}
+          <div className="relative w-20 h-20 mb-4">
+            <div className="absolute top-0 left-0 right-0 bottom-0 animate-spin rounded-full border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-100"></div>
+            <div className="absolute top-2 left-2 right-2 bottom-2 animate-spin rounded-full border-4 border-t-blue-400 border-r-blue-200 border-b-blue-100 border-l-transparent" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+            <div className="absolute top-4 left-4 right-4 bottom-4 animate-pulse flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-blue-500"></div>
+            </div>
+          </div>
+
+          {/* Textos informativos */}
+          <h2 className="text-xl font-semibold text-gray-800 text-center">Iniciando sesión</h2>
+          <p className="text-gray-500 mt-2 text-center">Estamos preparando tu experiencia</p>
+          
+          {/* Progreso animado y dinámico */}
+          <div className="w-full mt-6 h-1 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-blue-500 transition-all duration-300 ease-out"
+              style={{ width: `${loadingProgress}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">{loadingProgress}%</p>
+        </div>
       </div>
     );
   }
