@@ -32,12 +32,44 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const { loginWithPin } = useAuth();
   const redirect = searchParams.get("redirect") || "/";
   const hotelId = searchParams.get("hotelId");
   const requiredRole = searchParams.get("role");
+
+  // Verificar al cargar si ya hay una sesión en progreso
+  useEffect(() => {
+    // Primero, verificar si estamos en la página de login después de un logout
+    const isAfterLogout = sessionStorage.getItem("justLoggedOut");
+    
+    if (isAfterLogout === "true") {
+      // Limpiar el flag de redirección si acabamos de hacer logout
+      sessionStorage.removeItem("isRedirecting");
+      sessionStorage.removeItem("justLoggedOut");
+      setIsRedirecting(false);
+    } else {
+      // Verificar si hay una redirección en progreso
+      const redirectingFlag = sessionStorage.getItem("isRedirecting");
+      if (redirectingFlag === "true") {
+        // Comprobar cuándo se inició la redirección
+        const redirectStartTime = parseInt(sessionStorage.getItem("redirectStartTime") || "0");
+        const currentTime = new Date().getTime();
+        
+        // Si han pasado más de 10 segundos, consideramos que la redirección falló
+        if (currentTime - redirectStartTime > 10000) {
+          // Limpiar el estado de redirección
+          sessionStorage.removeItem("isRedirecting");
+          sessionStorage.removeItem("redirectStartTime");
+          setIsRedirecting(false);
+        } else {
+          setIsRedirecting(true);
+        }
+      }
+    }
+  }, []);
 
   const handlePinSearch = async (pin: string) => {
     try {
@@ -66,6 +98,19 @@ export default function LoginPage() {
       console.error("Error buscando PIN:", error);
       return null;
     }
+  };
+
+  const handleRedirection = (redirectUrl) => {
+    setIsRedirecting(true);
+    // Guardar el estado de redirección en sessionStorage
+    sessionStorage.setItem("isRedirecting", "true");
+    // Guardar el tiempo de inicio de la redirección
+    sessionStorage.setItem("redirectStartTime", new Date().getTime().toString());
+    
+    // Esperar un momento para asegurar que la sesión se guardó
+    setTimeout(() => {
+      window.location.href = redirectUrl;
+    }, 300);
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -119,17 +164,20 @@ export default function LoginPage() {
       document.cookie = `sessionStart=${Date.now()}; path=/; max-age=28800; SameSite=Lax`;
 
       // Redireccionar según el rol
+      let redirectUrl;
       if (userData.role === "super_admin") {
-        window.location.href = "/admin/dashboard";
+        redirectUrl = "/admin/dashboard";
       } else if (userData.role === "hotel_admin") {
-        window.location.href = "/hotel-admin/dashboard";
+        redirectUrl = "/hotel-admin/dashboard";
       } else {
-        window.location.href = redirect;
+        redirectUrl = redirect;
       }
+
+      handleRedirection(redirectUrl);
+      
     } catch (error) {
       console.error("Error de login:", error);
       setError("Credenciales inválidas");
-    } finally {
       setLoading(false);
     }
   };
@@ -193,20 +241,28 @@ export default function LoginPage() {
           redirectUrl = "/";
       }
 
-      // Esperar un momento para asegurar que la sesión se guardó
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      window.location.href = redirectUrl;
+      handleRedirection(redirectUrl);
+      
     } catch (error) {
       console.error("Error de login con PIN:", error);
       setError(error.message || "Error al iniciar sesión");
-    } finally {
       setLoading(false);
     }
   };
 
   // Determinar la pestaña por defecto
   const defaultTab = hotelId ? "pin" : "email";
+
+  // Si está redirigiendo, mostrar pantalla de carga
+  if (isRedirecting) {
+    return (
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+        <h2 className="text-xl font-semibold text-gray-700">Iniciando sesión...</h2>
+        <p className="text-gray-500 mt-2">Por favor espere un momento</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

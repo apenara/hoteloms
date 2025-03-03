@@ -51,6 +51,7 @@ interface ReceptionRoomCardProps {
     lastCleaned?: Date;
     cleaningStartTime?: Date;
     estimatedCompletionTime?: Date;
+    checkoutDate?: Date;
   };
   hotelId: string;
   currentUser: any;
@@ -393,111 +394,83 @@ export function ReceptionRoomCard({
     return new Date(timestamp);
   };
 
-  // Función para calcular las noches pendientes y dar formato
-  const calculateNights = (room) => {
+// Función para calcular las noches pendientes y dar formato
+const calculateNights = (room) => {
+  try {
+    // Verificar que tenemos datos de fechas válidos
+    if (!room.checkoutDate || !room.checkInDate) {
+      return <div className="text-gray-600">Estadía sin fecha definida</div>;
+    }
+
+    // Convertir fechas a objeto Date manejando Timestamps de Firestore
+    let checkIn, checkOut;
+
     try {
-      // Verificar que tenemos datos de fechas válidos
-      if (!room.checkoutDate || !room.checkInDate) {
-        return <div className="text-gray-600">Estadía sin fecha definida</div>;
-      }
+      // Usar la función específica para convertir timestamp
+      checkIn = convertFirestoreTimestamp(room.checkInDate);
+      checkOut = convertFirestoreTimestamp(room.checkoutDate);
 
-      // Convertir fechas a objeto Date manejando Timestamps de Firestore
-      let checkIn, checkOut;
-
-      try {
-        // Usar la función específica para convertir timestamp
-        checkIn = convertFirestoreTimestamp(room.checkInDate);
-        checkOut = convertFirestoreTimestamp(room.checkoutDate);
-
-        // Verificar que son fechas válidas
-        if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-          console.error(
-            "Fechas inválidas después de conversión:",
-            checkIn,
-            checkOut
-          );
-          return <div className="text-gray-600">Error en fecha</div>;
-        }
-      } catch (e) {
-        console.error("Error al convertir fechas:", e);
+      // Verificar que son fechas válidas
+      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+        console.error(
+          "Fechas inválidas después de conversión:",
+          checkIn,
+          checkOut
+        );
         return <div className="text-gray-600">Error en fecha</div>;
       }
-
-      // Reset para ignorar la hora y solo contar días
-      checkIn.setHours(0, 0, 0, 0);
-      checkOut.setHours(0, 0, 0, 0);
-
-      // Calcular diferencia en días - las noches son siempre un día menos que los días
-      const diffTime = checkOut.getTime() - checkIn.getTime();
-      const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      // Las noches son los días menos 1, mínimo 1 noche
-      const totalNights = Math.max(1, totalDays);
-
-      // Calcular noches restantes
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const remainingTime = checkOut.getTime() - today.getTime();
-      const remainingDays = Math.max(
-        0,
-        Math.ceil(remainingTime / (1000 * 60 * 60 * 24))
-      );
-      // Las noches restantes son los días restantes, mínimo 0
-      const remainingNights = Math.max(0, remainingDays);
-
-      return (
-        <div className="text-gray-600">
-          {remainingNights === 0 ? (
-            <span className="text-red-600 font-semibold">Último día</span>
-          ) : remainingNights === 1 ? (
-            <span className="text-orange-600 font-semibold">
-              Checkout mañana - {totalNights}{" "}
-              {totalNights === 1 ? "noche" : "noches"} total
-            </span>
-          ) : (
-            <span>
-              {remainingNights} noches restantes de {totalNights}
-            </span>
-          )}
-        </div>
-      );
-    } catch (error) {
-      console.error("Error al calcular noches:", error);
-      return <div className="text-gray-600">Error en cálculo</div>;
+    } catch (e) {
+      console.error("Error al convertir fechas:", e);
+      return <div className="text-gray-600">Error en fecha</div>;
     }
-  };
 
-  // Efecto para verificar automáticamente las habitaciones con checkout programado para hoy
-  useEffect(() => {
-    try {
-      if (room.status === "occupied" && room.checkoutDate) {
-        // Intentar convertir a fecha válida usando nuestra función especial para Timestamp
-        const checkoutDate = convertFirestoreTimestamp(room.checkoutDate);
+    // Reset para ignorar la hora y solo contar días
+    checkIn.setHours(0, 0, 0, 0);
+    checkOut.setHours(0, 0, 0, 0);
 
-        // Verificar que es una fecha válida
-        if (isNaN(checkoutDate.getTime())) {
-          console.error(
-            "Fecha de checkout inválida después de conversión:",
-            checkoutDate
-          );
-          return;
-        }
+    // Calcular diferencia en milisegundos
+    const diffTime = checkOut.getTime() - checkIn.getTime();
 
-        const today = new Date();
+    // Calcular diferencia en días, utilizando Math.ceil para redondear hacia arriba
+    const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        // Resetear horas para comparar solo las fechas
-        checkoutDate.setHours(0, 0, 0, 0);
-        today.setHours(0, 0, 0, 0);
+    // CORREGIDO: Solo restamos 1 día si estamos calculando las noches totales y no las noches restantes
+    const totalNights = totalDays -1; 
 
-        // Si es el día de checkout y no está ya marcada como checkout_today
-        if (checkoutDate.getTime() === today.getTime()) {
-          console.log("Es día de checkout para habitación:", room.number);
-          updateRoomState("checkout_today");
-        }
-      }
-    } catch (error) {
-      console.error("Error verificando fecha de checkout:", error);
-    }
-  }, [room.status, room.checkoutDate]);
+    // Calcular noches restantes
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const remainingTime = checkOut.getTime() - today.getTime();
+    const remainingDays = Math.max(
+      0,
+      Math.ceil(remainingTime / (1000 * 60 * 60 * 24))
+    );
+    // Las noches restantes son los días restantes, mínimo 0
+    const remainingNights = Math.max(0, remainingDays - 1);
+
+    return (
+      <div className="text-gray-600">
+        {remainingNights === 0 ? (
+          <span className="text-red-600 font-semibold">Último día</span>
+        ) : remainingNights === 1 ? (
+          <span className="text-orange-600 font-semibold">
+            Checkout mañana - {totalNights}{" "}
+            {totalNights === 1 ? "noche" : "noches"} total
+          </span>
+        ) : (
+          <span>
+            {remainingNights} noches restantes de {totalNights}
+          </span>
+        )}
+      </div>
+    );
+  } catch (error) {
+    console.error("Error al calcular noches:", error);
+    return <div className="text-gray-600">Error en cálculo</div>;
+  }
+};
+
+
 
   return (
     <div className="relative">

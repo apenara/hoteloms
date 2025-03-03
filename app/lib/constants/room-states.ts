@@ -1,5 +1,6 @@
 // src/lib/constants/room-states.ts
 import { Alert } from "@/app/components/ui/alert";
+import { dir } from "console";
 import {
   Clock,
   BedDouble,
@@ -173,6 +174,7 @@ export const ROLE_STATE_FLOWS = {
     checkout_today: ["checkout", "available"],
     occupied_maintenance: ["checkout"],
     clean_occupied: ["checkout"],
+    dirty_occupied: ["checkout"],
     checkout: ["in_house", "available"],
     in_house: ["occupied"],
     inspection: ["occupied", "in_house"],
@@ -213,6 +215,8 @@ export const ROLE_PERMISSIONS = {
       "in_house",
       "need_cleaning",
       "cleaning_checkout",
+      "cleaning_occupied",
+      "dirty_occupied",
       "inspection",
       "maintenance",
       "cleaning_touch",
