@@ -74,13 +74,12 @@ export default function HousekeepingStaffPage() {
 
     fetchData();
   }, [params?.hotelId, staff]);
-
   /**
    * This effect is responsible for redirecting the staff member if they are not authenticated or do not have the correct role.
    */
   useEffect(() => {
     if (!loading && !staff) {
-      router.push(`/housekeeping/login/${params.hotelId}`);
+      router.push(`/housekeeping/${params.hotelId}/login`);
     } else if (!loading && staff?.role !== "housekeeper") {
       setError("No tienes permisos de housekeeping");
     }
@@ -119,7 +118,7 @@ export default function HousekeepingStaffPage() {
                 {hotel?.name || "Panel de Housekeeping"}
               </h1>
               {/* Welcome message for the staff */}
-              <p className="text-sm text-gray-500">Bienvenido, {staff?.name}</p>
+              <p className="text-sm text-gray-500">Bienvenida, {staff?.name}</p>
             </div>
             {/* Logout Button */}
             <Button
@@ -139,10 +138,7 @@ export default function HousekeepingStaffPage() {
       {/* Main content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Housekeeping Staff View Component */}
-        <HousekeepingStaffView
-          hotelId={params.hotelId}
-          staffId={params.staffId}
-        />
+        <HousekeepingStaffView hotelId={params.hotelId} staffId={staff.id} />
       </main>
     </div>
   );

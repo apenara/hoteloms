@@ -70,6 +70,7 @@ export type RoomStatus =
   | "cleaning_touch"
   | "inspection"
   | "maintenance"
+  | "dirty_occupied"
   | "clean_occupied";
 
 export interface AccessLog {
