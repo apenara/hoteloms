@@ -5,7 +5,7 @@ import {
   Clock,
   BedDouble,
   Paintbrush,
-  AlertTriangle,
+  AlertTriangle, 
   CheckCircle,
   Trash2,
   Home,
