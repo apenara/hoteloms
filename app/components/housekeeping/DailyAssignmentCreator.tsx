@@ -30,6 +30,7 @@ import {
   Filter,
   BadgeInfo,
 } from "lucide-react";
+import { AssignmentExportButton } from "./AssignmentExportButton";
 import { Staff, Room } from "@/app/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -102,6 +103,7 @@ export function DailyAssignmentCreator({
     "checkout_today",
     "clean_occupied",
     "need_cleaning",
+    "dirty_occupied",
   ]);
   const [showStaffSelector, setShowStaffSelector] = useState<boolean>(false);
   const [selectedStaffMembers, setSelectedStaffMembers] = useState<Set<string>>(
@@ -1104,6 +1106,16 @@ export function DailyAssignmentCreator({
                 })}
               </TableBody>
             </Table>
+
+            {/* Botón para descargar asignaciones */}
+            <div className="mt-4 flex justify-end">
+              <AssignmentExportButton
+                assignments={existingAssignments}
+                habitaciones={habitaciones}
+                camareras={camareras}
+                selectedDate={selectedDate}
+              />
+            </div>
           </CardContent>
         </Card>
       )}

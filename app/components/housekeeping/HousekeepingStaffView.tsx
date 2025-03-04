@@ -17,10 +17,12 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Clock,
   CheckCircle,
@@ -29,6 +31,8 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { Room, Staff } from "@/lib/types";
+// Importar solo las funciones de cálculo necesarias
+import { calcularProgresoLimpieza } from "@/app/lib/utils/housekeeping";
 
 interface HousekeepingStaffViewProps {
   hotelId: string;
@@ -57,6 +61,8 @@ const HousekeepingStaffView = ({
   const [activeTab, setActiveTab] = useState("pending");
   const [completedRooms, setCompletedRooms] = useState<Room[]>([]);
   const [staffData, setStaffData] = useState<Staff | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // Obtener los datos del personal y habitaciones asignadas
   useEffect(() => {
@@ -223,24 +229,15 @@ const HousekeepingStaffView = ({
     });
   };
 
-  // Calcular progreso de limpieza
+  // Calcular progreso de limpieza usando la función especializada
   const calculateProgress = (room: Room) => {
-    if (!room.currentCleaning?.startedAt) return 0;
-
-    const startTime = room.currentCleaning.startedAt.toDate();
-    const now = new Date();
-    const elapsedMinutes = Math.floor(
-      (now.getTime() - startTime.getTime()) / (1000 * 60)
-    );
-
-    // Tiempos esperados según tipo de limpieza
-    let expectedTime = 30; // minutos
-    if (room.status === "cleaning_checkout") expectedTime = 45;
-    if (room.status === "cleaning_occupied") expectedTime = 30;
-    if (room.status === "cleaning_touch") expectedTime = 15;
-
-    return Math.min(100, (elapsedMinutes / expectedTime) * 100);
+    // Usar la función calcularProgresoLimpieza importada
+    return calcularProgresoLimpieza(room);
   };
+
+  // Esta vista solo muestra las habitaciones asignadas y sus estados actuales
+  // No realiza cambios de estado directamente desde aquí, ya que las camareras
+  // lo hacen físicamente cuando visitan cada habitación
 
   // Obtener el tiempo transcurrido en formato legible
   const getElapsedTime = (timestamp) => {
@@ -281,6 +278,12 @@ const HousekeepingStaffView = ({
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {error && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-4">
                 {assignedRooms.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
@@ -338,6 +341,41 @@ const HousekeepingStaffView = ({
                               <Clock className="h-4 w-4" />
                               Actualización: {formatDate(room.lastStatusChange)}
                             </span>
+                          </div>
+
+                          {/* Estado de la limpieza */}
+                          <div className="flex items-center gap-2 mt-4">
+                            <Badge
+                              className={
+                                [
+                                  "cleaning_checkout",
+                                  "cleaning_occupied",
+                                  "cleaning_touch",
+                                ].includes(room.status)
+                                  ? "bg-blue-100 text-blue-800 border-blue-200"
+                                  : [
+                                      "need_cleaning",
+                                      "checkout_today",
+                                      "occupied",
+                                    ].includes(room.status)
+                                  ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                  : "bg-green-100 text-green-800 border-green-200"
+                              }
+                            >
+                              {[
+                                "cleaning_checkout",
+                                "cleaning_occupied",
+                                "cleaning_touch",
+                              ].includes(room.status)
+                                ? "En proceso de limpieza"
+                                : [
+                                    "need_cleaning",
+                                    "checkout_today",
+                                    "occupied",
+                                  ].includes(room.status)
+                                ? "Pendiente de limpieza"
+                                : "Limpieza completada"}
+                            </Badge>
                           </div>
                         </div>
                       </div>
@@ -416,6 +454,8 @@ const HousekeepingStaffView = ({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Ya no es necesario el diálogo de completar limpieza */}
     </div>
   );
 };
