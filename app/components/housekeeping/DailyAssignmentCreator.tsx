@@ -30,6 +30,7 @@ import {
   Filter,
   BadgeInfo,
 } from "lucide-react";
+import { AssignmentExportButton } from "./AssignmentExportButton";
 import { Staff, Room } from "@/app/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -1105,6 +1106,16 @@ export function DailyAssignmentCreator({
                 })}
               </TableBody>
             </Table>
+
+            {/* Botón para descargar asignaciones */}
+            <div className="mt-4 flex justify-end">
+              <AssignmentExportButton
+                assignments={existingAssignments}
+                habitaciones={habitaciones}
+                camareras={camareras}
+                selectedDate={selectedDate}
+              />
+            </div>
           </CardContent>
         </Card>
       )}
