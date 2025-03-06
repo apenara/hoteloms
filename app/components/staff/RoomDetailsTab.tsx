@@ -71,6 +71,9 @@ export function RoomDetailsTab({
           case 'need_cleaning':
             states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch', 'do_not_disturb'];
             break;
+          case 'dirty_occupied':
+            states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch', 'do_not_disturb'];
+            break;
           default:
             states = ['cleaning_occupied', 'cleaning_checkout', 'cleaning_touch'];
         }

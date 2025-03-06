@@ -190,6 +190,7 @@ export const ROLE_STATE_FLOWS = {
       "cleaning_occupied",
       "cleaning_checkout",
       "cleaning_touch",
+      "do_not_disturb",
     ],
     cleaning_checkout: ["ready_for_inspection"],
     cleaning_touch: ["ready_for_inspection"],

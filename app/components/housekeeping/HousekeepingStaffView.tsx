@@ -138,6 +138,7 @@ const HousekeepingStaffView = ({
           "cleaning_touch",
           "checkout_today",
           "occupied",
+          "dirty_occupied",
         ].includes(foundRoom.status)
       );
 
@@ -169,6 +170,7 @@ const HousekeepingStaffView = ({
         return "bg-yellow-100 text-yellow-800";
       case "cleaning_checkout":
       case "cleaning_occupied":
+      case "dirty_occupied":
       case "cleaning_touch":
       case "checkout_today":
         return "bg-blue-100 text-blue-800";
