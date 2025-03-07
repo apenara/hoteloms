@@ -109,8 +109,74 @@ export const getDiasTranscurridos = (
   }
 };
 
+// Importamos el servicio de tipos de habitación
+import { getCleaningTimeForRoomType } from "@/app/services/room-types-service";
+
+// Variable para almacenar hotelId por room.id para evitar pasar el hotelId en cada llamada
+const roomHotelIdMap: Record<string, string> = {};
+
+// Configuración de caché para tiempos de limpieza
+interface CleaningTimeCache {
+  time: number;
+  timestamp: number;
+}
+const cleaningTimeCache: Record<string, CleaningTimeCache> = {};
+const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutos
+
 // Obtener tiempo esperado según tipo de limpieza y tipo de habitación
 export const getTiempoEsperado = (
+  tipoLimpieza: string,
+  tipoHabitacion: string,
+  roomId?: string,
+  roomTypeId?: string,
+  hotelId?: string
+): number => {
+  // Si no tenemos roomId ni roomTypeId ni hotelId, usamos el método legacy
+  if (!roomId && !roomTypeId && !hotelId) {
+    return getTiempoEsperadoLegacy(tipoLimpieza, tipoHabitacion);
+  }
+  
+  // Clave para cache
+  const cacheKey = `${roomTypeId || tipoHabitacion}_${tipoLimpieza}_${hotelId || ''}`;
+  
+  // Verificar si tenemos un valor en caché válido
+  if (cleaningTimeCache[cacheKey] && 
+      Date.now() - cleaningTimeCache[cacheKey].timestamp < CACHE_EXPIRATION) {
+    return cleaningTimeCache[cacheKey].time;
+  }
+  
+  // Si tenemos roomTypeId y hotelId, obtener de la base de datos de forma asíncrona
+  if ((roomTypeId || tipoHabitacion) && hotelId) {
+    // Este es un patrón para manejar llamadas asíncronas en una función síncrona
+    // Retornamos el valor por defecto y actualizamos el caché en segundo plano
+    const defaultTime = getTiempoEsperadoLegacy(tipoLimpieza, tipoHabitacion);
+    
+    // Almacenar hotelId por roomId para futuras llamadas
+    if (roomId && hotelId) {
+      roomHotelIdMap[roomId] = hotelId;
+    }
+    
+    // Actualizar el caché en segundo plano
+    getCleaningTimeForRoomType(hotelId, roomTypeId || tipoHabitacion, tipoLimpieza)
+      .then(time => {
+        cleaningTimeCache[cacheKey] = {
+          time,
+          timestamp: Date.now()
+        };
+      })
+      .catch(err => {
+        console.error("Error al obtener tiempo de limpieza:", err);
+      });
+    
+    return defaultTime;
+  }
+  
+  // Si no podemos obtener de la base de datos, usar método legacy
+  return getTiempoEsperadoLegacy(tipoLimpieza, tipoHabitacion);
+};
+
+// Método legacy para mantener compatibilidad
+const getTiempoEsperadoLegacy = (
   tipoLimpieza: string,
   tipoHabitacion: string
 ): number => {
@@ -254,7 +320,13 @@ const calcularEficienciaHabitacion = (
   historial: any[]
 ): number => {
   const tipoHabitacion = habitacion.type || "standard";
-  const tiempoEsperado = getTiempoEsperado(habitacion.status, tipoHabitacion);
+  const tiempoEsperado = getTiempoEsperado(
+    habitacion.status, 
+    tipoHabitacion, 
+    habitacion.id, 
+    habitacion.roomTypeId, 
+    habitacion.hotelId
+  );
   const tiempoReal = habitacion.tiempoLimpieza || 0;
 
   if (tiempoReal === 0) return 100;
@@ -290,9 +362,12 @@ export const getTiempoTranscurrido = (
 
 export const getDuracionEstimada = (
   tipoLimpieza: string,
-  tipoHabitacion: string = "standard"
+  tipoHabitacion: string = "standard",
+  roomId?: string,
+  roomTypeId?: string,
+  hotelId?: string
 ): number => {
-  return getTiempoEsperado(tipoLimpieza, tipoHabitacion);
+  return getTiempoEsperado(tipoLimpieza, tipoHabitacion, roomId, roomTypeId, hotelId);
 };
 
 export const calcularProgresoLimpieza = (

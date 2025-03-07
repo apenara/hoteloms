@@ -22,6 +22,7 @@ import { ROOM_STATES } from "@/app/lib/constants/room-states";
 import { User, Room } from "@/app/lib/types";
 import { Button } from "@/app/components/ui/button";
 import AuthMonitor from "@/app/components/dashboard/AuthMonitor";
+import OneSignalNotifications from "@/app/components/dashboard/OneSignalNotifications";
 
 /**
  * @description This constant defines the different states a room can have and their respective labels, icons, and colors.
@@ -168,6 +169,9 @@ export default function HotelDashboard() {
             Dashboard Nombre del Hotel{" "}
             <NotificationsDialog hotelId={user?.hotelId} />
           </CardTitle>
+
+          {/* Componente de notificaciones de OneSignal */}
+          <OneSignalNotifications />
 
           {/* Filtros */}
           <div className="flex flex-col sm:flex-row gap-4 mb-4">

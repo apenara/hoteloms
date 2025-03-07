@@ -35,11 +35,11 @@ export function CamareraMobileView({ camarera, habitaciones, hotelId }: Camarera
   );
 
   // Cálculos de tiempos
-  const tiemposLimpiezaPorTipo: Record<string, number[]> = {
+  const [tiemposLimpiezaPorTipo, setTiemposLimpiezaPorTipo] = useState<Record<string, number[]>>({
     checkout: [],
     occupied: [],
     touch: []
-  };
+  });
 
   // Función para obtener el historial de limpiezas de la camarera
   useEffect(() => {
@@ -65,21 +65,33 @@ export function CamareraMobileView({ camarera, habitaciones, hotelId }: Camarera
           ...doc.data()
         }));
         
+        // Crear un nuevo objeto para evitar mutaciones
+        const nuevosTiempos: Record<string, number[]> = {
+          checkout: [],
+          occupied: [],
+          touch: []
+        };
+        
         // Agrupar los tiempos por tipo
         records.forEach(record => {
           const tipoLimpieza = record.tipoLimpieza || 'occupied';
           const tiempoTotal = record.tiempoTotal || 0;
           
-          if (tipoLimpieza.includes('checkout')) {
-            tiemposLimpiezaPorTipo.checkout.push(tiempoTotal);
+          // Verificar también si es una limpieza de checkout
+          if (tipoLimpieza.includes('checkout') || record.esLimpiezaCheckout) {
+            nuevosTiempos.checkout.push(tiempoTotal);
           } else if (tipoLimpieza.includes('occupied')) {
-            tiemposLimpiezaPorTipo.occupied.push(tiempoTotal);
+            nuevosTiempos.occupied.push(tiempoTotal);
           } else if (tipoLimpieza.includes('touch')) {
-            tiemposLimpiezaPorTipo.touch.push(tiempoTotal);
+            nuevosTiempos.touch.push(tiempoTotal);
           }
         });
         
+        setTiemposLimpiezaPorTipo(nuevosTiempos);
         setHistorial(records);
+        
+        console.log("Registros cargados:", records.length);
+        console.log("Tiempos por tipo:", nuevosTiempos);
       } catch (error) {
         console.error('Error al cargar historial:', error);
       } finally {

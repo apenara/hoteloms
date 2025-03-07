@@ -37,6 +37,8 @@ interface StatusHistoryEntry extends BaseHistoryEntry {
   previousStatus: string;
   newStatus: string;
   notes: string;
+  roomType?: string;
+  tiempoDesdeUltimoEstado?: number; // tiempo en segundos
 }
 
 interface MaintenanceHistoryEntry extends BaseHistoryEntry {
@@ -277,6 +279,8 @@ export function RoomHistoryTabs({ roomId, hotelId }: RoomHistoryTabsProps) {
           <TableHead>Fecha</TableHead>
           <TableHead>Estado Anterior</TableHead>
           <TableHead>Nuevo Estado</TableHead>
+          <TableHead>Tiempo</TableHead>
+          <TableHead>Tipo</TableHead>
           <TableHead>Usuario</TableHead>
           <TableHead>Notas</TableHead>
         </TableRow>
@@ -290,6 +294,16 @@ export function RoomHistoryTabs({ roomId, hotelId }: RoomHistoryTabsProps) {
             </TableCell>
             <TableCell>
               {ROOM_STATES[entry.newStatus]?.label || entry.newStatus}
+            </TableCell>
+            <TableCell>
+              {entry.tiempoDesdeUltimoEstado ? (
+                formatTime(entry.tiempoDesdeUltimoEstado)
+              ) : (
+                "—"
+              )}
+            </TableCell>
+            <TableCell>
+              {entry.roomType || "—"}
             </TableCell>
             <TableCell>
               {entry.staffInfo ? (
@@ -310,6 +324,29 @@ export function RoomHistoryTabs({ roomId, hotelId }: RoomHistoryTabsProps) {
       </TableBody>
     </Table>
   );
+  
+  // Función auxiliar para formatear el tiempo
+  const formatTime = (timeInSeconds: number) => {
+    if (!timeInSeconds) return "—";
+    
+    // Para tiempos menores a un minuto
+    if (timeInSeconds < 60) {
+      return `${timeInSeconds}s`;
+    }
+    
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = timeInSeconds % 60;
+    
+    // Para tiempos menores a una hora
+    if (minutes < 60) {
+      return `${minutes}m ${seconds}s`;
+    }
+    
+    // Para tiempos mayores a una hora
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  };
 
   // Renderizar tabla de historial de mantenimiento
   const renderMaintenanceHistoryTable = () => (

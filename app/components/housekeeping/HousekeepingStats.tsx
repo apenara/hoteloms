@@ -95,15 +95,22 @@ export function HousekeepingStats({
         enProgreso: 0,
       },
     };
-
-    // Check if habitaciones exists and is an array before using forEach
+    
+    // Cargar datos de cleaningStats si están disponibles en las habitaciones
     if (habitacionesFiltradas && Array.isArray(habitacionesFiltradas)) {
+      // Primera pasada: contar habitaciones y estados
       habitacionesFiltradas.forEach((hab) => {
         // Checkout
-        if (hab.status === "cleaning_checkout" || hab.status === "checkout") {
+        if (hab.status === "cleaning_checkout" || hab.status === "checkout" || 
+            (hab.cleaningStats?.esLimpiezaCheckout)) {
           stats.checkout.total++;
           if (hab.status === "cleaning_checkout") stats.checkout.enProgreso++;
-          if (hab.tiempoLimpieza) {
+          
+          // Si tiene estadísticas guardadas para checkout
+          if (hab.cleaningStats?.esLimpiezaCheckout && hab.cleaningStats?.lastCleaningTime) {
+            stats.checkout.tiempoPromedio += hab.cleaningStats.lastCleaningTime;
+            stats.checkout.completadas++;
+          } else if (hab.tiempoLimpieza && hab.cleaningStats?.lastCleaningType?.includes('checkout')) {
             stats.checkout.tiempoPromedio += hab.tiempoLimpieza;
             stats.checkout.completadas++;
           }
@@ -112,7 +119,7 @@ export function HousekeepingStats({
         else if (hab.status === "checkout_today") {
           stats.checkout_today.total++;
           stats.checkout_today.enProgreso++;
-          if (hab.tiempoLimpieza) {
+          if (hab.tiempoLimpieza && hab.cleaningStats?.lastCleaningType?.includes('checkout')) {
             stats.checkout_today.tiempoPromedio += hab.tiempoLimpieza;
             stats.checkout_today.completadas++;
           }
@@ -121,7 +128,7 @@ export function HousekeepingStats({
         else if (hab.status === "cleaning_occupied") {
           stats.occupied.total++;
           stats.occupied.enProgreso++;
-          if (hab.tiempoLimpieza) {
+          if (hab.tiempoLimpieza && hab.cleaningStats?.lastCleaningType?.includes('occupied')) {
             stats.occupied.tiempoPromedio += hab.tiempoLimpieza;
             stats.occupied.completadas++;
           }
@@ -141,7 +148,7 @@ export function HousekeepingStats({
             }
           }
 
-          if (hab.tiempoLimpieza) {
+          if (hab.tiempoLimpieza && hab.cleaningStats?.lastCleaningType?.includes('occupied')) {
             stats.clean_occupied.tiempoPromedio += hab.tiempoLimpieza;
             stats.clean_occupied.completadas++;
           }
@@ -150,8 +157,24 @@ export function HousekeepingStats({
         else if (hab.status === "cleaning_touch") {
           stats.touch.total++;
           stats.touch.enProgreso++;
-          if (hab.tiempoLimpieza) {
+          if (hab.tiempoLimpieza && hab.cleaningStats?.lastCleaningType?.includes('touch')) {
             stats.touch.tiempoPromedio += hab.tiempoLimpieza;
+            stats.touch.completadas++;
+          }
+        }
+        
+        // También verificar si hay estadísticas de cleanings almacenadas
+        if (hab.cleaningStats) {
+          const type = hab.cleaningStats.lastCleaningType;
+          
+          if (type?.includes('checkout') && !stats.checkout.completadas && hab.cleaningStats.lastCleaningTime) {
+            stats.checkout.tiempoPromedio += hab.cleaningStats.lastCleaningTime;
+            stats.checkout.completadas++;
+          } else if (type?.includes('occupied') && !stats.occupied.completadas && hab.cleaningStats.lastCleaningTime) {
+            stats.occupied.tiempoPromedio += hab.cleaningStats.lastCleaningTime;
+            stats.occupied.completadas++;
+          } else if (type?.includes('touch') && !stats.touch.completadas && hab.cleaningStats.lastCleaningTime) {
+            stats.touch.tiempoPromedio += hab.cleaningStats.lastCleaningTime;
             stats.touch.completadas++;
           }
         }
@@ -172,7 +195,8 @@ export function HousekeepingStats({
           stats[tipo as keyof typeof stats].completadas;
       }
     });
-
+    
+    console.log("Estadísticas calculadas:", stats);
     return stats;
   };
 
@@ -196,7 +220,11 @@ export function HousekeepingStats({
         if (hab.type && statsPorTipo[hab.type]) {
           statsPorTipo[hab.type].total++;
 
-          if (hab.tiempoLimpieza) {
+          // Verificar si tenemos datos de limpieza específicos para este tipo
+          if (hab.cleaningStats?.lastCleaningTime) {
+            statsPorTipo[hab.type].tiempoPromedio += hab.cleaningStats.lastCleaningTime;
+            statsPorTipo[hab.type].completadas++;
+          } else if (hab.tiempoLimpieza) {
             statsPorTipo[hab.type].tiempoPromedio += hab.tiempoLimpieza;
             statsPorTipo[hab.type].completadas++;
           }
@@ -204,6 +232,10 @@ export function HousekeepingStats({
       });
     }
 
+    // Consultar tiempos almacenados en métricas de staff también
+    // Esta sección podría extenderse para hacer una consulta directa a la colección housekeeping_stats
+    // para obtener datos más precisos por tipo de habitación
+    
     // Calcular promedios
     Object.keys(statsPorTipo).forEach((tipo) => {
       if (statsPorTipo[tipo].completadas > 0) {
@@ -212,6 +244,7 @@ export function HousekeepingStats({
       }
     });
 
+    console.log("Estadísticas por tipo de habitación:", statsPorTipo);
     return statsPorTipo;
   };
 

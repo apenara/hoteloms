@@ -5,6 +5,7 @@ import { AuthProvider } from "@/lib/auth";
 import ClientLayout from "./ClientLayout";
 // import { NotificationProvider } from "./components/providers/NotificationProvider";
 import { Toaster } from "./components/ui/toaster";
+import OneSignalProvider from "./components/providers/OneSignalProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${inter.className} antialiased`}>
         <AuthProvider>
+          <OneSignalProvider />
           <ClientLayout>{children}</ClientLayout>{" "}
           <Toaster />
         </AuthProvider>

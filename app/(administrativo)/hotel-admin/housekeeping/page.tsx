@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Users, BarChart3, History, ClipboardList, CalendarRange, User } from "lucide-react";
+import { Search, Users, BarChart3, History, ClipboardList, CalendarRange, User, BarChart4 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HousekeepingStaffList } from "@/components/housekeeping/HousekeepingStaffList";
 import { HousekeepingStats } from "@/components/housekeeping/HousekeepingStats";
 import { HousekeepingHistory } from "@/components/housekeeping/HousekeepingHistory";
 import { HousekeepingMetrics } from "@/components/housekeeping/HousekeepingMetrics";
+import HousekeepingStatsByType from "@/components/housekeeping/HousekeepingStatsByType";
 import { DailyAssignmentCreator } from "@/components/housekeeping/DailyAssignmentCreator";
 import { ActiveCamareraList } from "@/components/housekeeping/ActiveCamareraList";
 import { CamareraMobileView } from "@/components/housekeeping/CamareraMobileView";
@@ -28,12 +29,12 @@ interface HousekeepingStatsProps {
 }
 
 const TABS = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: BarChart3,
-    component: HousekeepingStats,
-  },
+  // {
+  //   id: "dashboard",
+  //   label: "Dashboard",
+  //   icon: BarChart3,
+  //   component: HousekeepingStats,
+  // },
   {
     id: "assignment",
     label: "Asignación Diaria",
@@ -63,6 +64,12 @@ const TABS = [
     label: "Métricas",
     icon: ClipboardList,
     component: HousekeepingMetrics,
+  },
+  {
+    id: "tiempos",
+    label: "Tiempos",
+    icon: BarChart4,
+    component: HousekeepingStatsByType,
   },
 ];
 
@@ -278,6 +285,9 @@ export default function HousekeepingPage() {
                   estadisticasGlobales={estadisticasGlobales}
                   selectedDate={selectedDate}
                   onDateChange={setSelectedDate}
+                  camareras={camareras}
+                  habitaciones={habitaciones}
+                  loading={loading}
                 />
               )}
 
@@ -318,6 +328,10 @@ export default function HousekeepingPage() {
                   habitaciones={habitaciones}
                   estadisticasGlobales={estadisticasGlobales}
                 />
+              )}
+              
+              {activeTab === "tiempos" && (
+                <HousekeepingStatsByType period="weekly" />
               )}
             </ScrollArea>
           </Tabs>
