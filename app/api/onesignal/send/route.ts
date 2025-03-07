@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 // Constantes para OneSignal
 const ONESIGNAL_APP_ID = "d1a785f6-55aa-44de-91cd-667ab581d0b0";
@@ -16,6 +17,19 @@ const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || "tu_rest_ap
  */
 export async function POST(req: Request) {
   try {
+    // Verificar autenticación del usuario
+    const cookieStore = cookies();
+    const authToken = cookieStore.get('authToken')?.value;
+    const staffAccess = cookieStore.get('staffAccess')?.value;
+    
+    // Verificar que el usuario esté autenticado de alguna forma
+    if (!authToken && !staffAccess) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 403 }
+      );
+    }
+    
     // Obtener datos de la solicitud
     const { recipient, title, message, data } = await req.json();
     

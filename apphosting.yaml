@@ -71,3 +71,9 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  - variable: ONESIGNAL_REST_API_KEY
+    value: "os_v2_app_2gtyl5svvjcn5eonmz5llaoqwbrgxqrtpnpersnjjwa67su5sgvphlszd7kfefnfolsuvdk2bcenhdpgaijckciamhbza75ouq2lbti"
+    availability:
+      - BUILD
+      - RUNTIME
