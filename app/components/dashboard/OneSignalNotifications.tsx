@@ -6,6 +6,21 @@ import { oneSignalService } from '@/app/services/oneSignalService';
 import { useAuth } from '@/lib/auth';
 import { BellRing } from 'lucide-react';
 
+// Función para obtener el nombre legible de un rol
+const getRoleName = (roleCode: string): string => {
+  const roleNames: Record<string, string> = {
+    'admin': 'Administrador',
+    'manager': 'Gerente',
+    'reception': 'Recepcionista',
+    'housekeeping': 'Housekeeping',
+    'maintenance': 'Mantenimiento',
+    'front': 'Front Desk',
+    'superadmin': 'Super Administrador'
+  };
+
+  return roleNames[roleCode] || roleCode;
+};
+
 export default function OneSignalNotifications() {
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,9 +68,24 @@ export default function OneSignalNotifications() {
           await oneSignalService.subscribeToTopic(`hotel-${hotelId}`);
         }
         
-        // Si es personal, suscribir a notificaciones de su rol
+        // Si es personal, suscribir a notificaciones por su rol
         if (staffMember?.role) {
+          // Registrar el rol para segmentación
           await oneSignalService.subscribeToTopic(`role-${staffMember.role}`);
+          
+          // También almacenamos el nombre del rol para mayor claridad
+          const roleName = getRoleName(staffMember.role);
+          await oneSignalService.setTags({
+            'role': staffMember.role,
+            'roleName': roleName,
+            'isStaff': 'true'
+          });
+        } else if (user) {
+          // Para usuarios comunes (no staff)
+          await oneSignalService.setTags({
+            'isStaff': 'false',
+            'isGuest': 'true'
+          });
         }
       } else {
         setNotificationsEnabled(false);

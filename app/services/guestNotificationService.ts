@@ -1,27 +1,33 @@
 // src/services/guestNotificationService.ts
 import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { notificationManagerService, RequestType } from './notificationManagerService';
 
+// Mapa de tipos de notificación con sus configuraciones
 const NOTIFICATION_TYPES = {
   need_cleaning: {
     title: 'Nueva solicitud de limpieza',
     body: 'Habitación {roomNumber} solicita servicio de limpieza',
-    role: 'housekeeper'
+    role: 'housekeeping',
+    requestType: RequestType.NEED_CLEANING
   },
   need_towels: {
     title: 'Solicitud de toallas',
     body: 'Habitación {roomNumber} necesita toallas adicionales',
-    role: 'housekeeper'
+    role: 'housekeeping',
+    requestType: RequestType.NEED_TOWELS
   },
   guest_request: {
     title: 'Nuevo mensaje del huésped',
     body: 'Habitación {roomNumber} envió un mensaje',
-    role: 'reception'
+    role: 'reception',
+    requestType: RequestType.GUEST_MESSAGE
   },
   do_not_disturb: {
     title: 'No molestar activado',
     body: 'Habitación {roomNumber} activó No Molestar',
-    role: 'housekeeper'
+    role: 'housekeeping',
+    requestType: RequestType.DO_NOT_DISTURB
   }
 };
 
@@ -46,79 +52,84 @@ export async function sendGuestRequestNotification({
       throw new Error('Tipo de notificación no válido');
     }
 
-    // 1. Obtener tokens de los usuarios del rol correspondiente
-    const tokensRef = collection(db, 'notification_tokens');
-    const q = query(
-      tokensRef,
-      where('hotelId', '==', hotelId),
-      where('role', '==', notificationConfig.role)
-    );
-
-    const snapshot = await getDocs(q);
-    const tokens = snapshot.docs.map(doc => doc.data().token);
     const timestamp = Timestamp.now();
 
-    if (tokens.length === 0) {
-      console.log('No hay tokens disponibles para notificar');
-    }
-
-    //Get all the users with the notification config role
+    // 1. Guardar la notificación en Firestore para cada miembro del personal objetivo
     const staffRef = collection(db, 'hotels', hotelId, 'staff');
     const staffQuery = query(staffRef, where('role', '==', notificationConfig.role));
     const staffSnapshot = await getDocs(staffQuery);
 
-    // 2. Preparar el payload de la notificación
-    const payload = {
-      notification: {
-        title: notificationConfig.title,
-        body: notificationConfig.body.replace('{roomNumber}', roomNumber)
-      },
-      data: {
-        type,
-        hotelId,
-        roomId,
-        roomNumber: roomNumber.toString(),
-        message,
-        url: `/rooms/${hotelId}/${roomId}/staff`
-      },
-      tokens
-    };
-    
-    // 3. save notifications in the database.
+    // Guardar notificaciones en la base de datos
     const notificationsRef = collection(db, 'hotels', hotelId, 'notifications');
     const notificationPromises = staffSnapshot.docs.map(async (doc) => {
       const staffMember = doc.data();
       await addDoc(notificationsRef, {
         type: type,
-        message: message ? message: `Nueva solicitud de ${type} - Habitación ${roomNumber}`, // Default message
+        message: message ? message : `Nueva solicitud de ${type} - Habitación ${roomNumber}`,
         roomId: roomId,
         roomNumber: roomNumber,
         timestamp: timestamp,
         status: 'unread',
         priority: type === 'need_cleaning' ? 'high' : 'normal',
         targetRole: notificationConfig.role,
-        targetStaffId: staffMember.id, // Add specific staff member id
+        targetStaffId: staffMember.id,
         createdAt: timestamp,
-        alertLevel: 0, // Set initial alert level
+        alertLevel: 0,
       });
     });
     await Promise.all(notificationPromises);
 
-    // 4. Send the notification
-    const response = await fetch('/api/notifications/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    // 2. Enviar notificación push usando OneSignal a través de nuestro servicio gestor
+    let result = false;
 
-    if (!response.ok) {
-      throw new Error('Error al enviar notificación');
+    // Usar el servicio apropiado según el tipo de solicitud
+    switch (notificationConfig.requestType) {
+      case RequestType.NEED_TOWELS:
+        result = await notificationManagerService.sendTowelRequest(hotelId, roomNumber);
+        break;
+      
+      case RequestType.NEED_CLEANING:
+        result = await notificationManagerService.sendCleaningRequest(hotelId, roomNumber);
+        break;
+      
+      case RequestType.GUEST_MESSAGE:
+        result = await notificationManagerService.sendGuestMessage(hotelId, roomNumber, message);
+        break;
+      
+      case RequestType.DO_NOT_DISTURB:
+        // Para solicitudes de "No molestar", usamos el método genérico
+        result = await notificationManagerService.sendRequestNotification(
+          RequestType.DO_NOT_DISTURB,
+          { hotelId },
+          {
+            title: "No Molestar Activado",
+            message: `Habitación ${roomNumber} ha activado No Molestar`,
+            roomNumber,
+            data: { timestamp: timestamp.toDate().toISOString() }
+          }
+        );
+        break;
+      
+      default:
+        // Método genérico para otros tipos de solicitudes
+        result = await notificationManagerService.sendRequestNotification(
+          notificationConfig.requestType || RequestType.GENERAL_ALERT,
+          { hotelId },
+          {
+            title: notificationConfig.title,
+            message: notificationConfig.body.replace('{roomNumber}', roomNumber),
+            roomNumber,
+            data: { 
+              type, 
+              message,
+              roomId,
+              url: `/rooms/${hotelId}/${roomId}/staff` 
+            }
+          }
+        );
     }
 
-    const result = await response.json();
-    return result.success;
+    return result;
 
   } catch (error) {
     console.error('Error sending guest notification:', error);

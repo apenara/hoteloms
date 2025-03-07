@@ -15,6 +15,7 @@ import {
 import { db } from "@/lib/firebase/config";
 import type { Room } from "@/lib/types";
 import { notificationService, NotificationType } from "./notificationService";
+import { notificationManagerService, RequestType } from "./notificationManagerService";
 
 interface CreateMaintenanceParams {
   hotelId: string;
@@ -96,6 +97,14 @@ export async function createMaintenanceRequest({
         roomNumber: room.number,
         priority: "medium",
       }
+    );
+    
+    // 4. Enviar notificación push mediante OneSignal
+    await notificationManagerService.sendMaintenanceRequest(
+      hotelId,
+      room.number.toString(),
+      notes,
+      "medium"
     );
 
     return maintenanceDoc.id;
